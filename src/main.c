@@ -60,6 +60,13 @@ typedef struct PetInst {
     HBITMAP oldbmp;
     HBITMAP dib;
     BYTE *dib_pixels;
+    /* drag state */
+    int dragging;
+    int drag_anchor_x;
+    int drag_anchor_y;
+    int last_drag_x;
+    DWORD last_drag_tick;
+    float drag_speed;
 } PetInst;
 
 typedef struct {
@@ -396,7 +403,60 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->hwnd = hwnd;
         ensure_buffer(pi);
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
-        SetTimer(hwnd, IDT_PET, 30, NULL);
+        SetTimer(hwnd, IDT_PET, 16, NULL);
+        return 0;
+    }
+    case WM_LBUTTONDOWN: {
+        if (!pi) return 0;
+        SetCapture(hwnd);
+        pi->dragging = 1;
+        pi->drag_anchor_x = pi->x - (short)LOWORD(l);
+        pi->drag_anchor_y = pi->y - (short)HIWORD(l);
+        pi->last_drag_x = pi->x;
+        pi->last_drag_tick = GetTickCount();
+        pi->drag_speed = 0.0f;
+        return 0;
+    }
+    case WM_MOUSEMOVE: {
+        if (!pi || !pi->dragging) return 0;
+        int mx = (short)LOWORD(l);
+        int my = (short)HIWORD(l);
+        int new_x = pi->drag_anchor_x + mx;
+        int new_y = pi->drag_anchor_y + my;
+
+        int dx = new_x - pi->last_drag_x;
+        DWORD now = GetTickCount();
+        DWORD dt = now - pi->last_drag_tick;
+        if (dt == 0) dt = 1;
+
+        pi->x = new_x;
+        pi->y = new_y;
+        pi->last_drag_x = new_x;
+        pi->last_drag_tick = now;
+
+        /* direction: only horizontal component matters */
+        if (dx < 0) {
+            if (pi->state != 2) { pi->state = 2; pi->frame = 0; }
+        } else if (dx > 0) {
+            if (pi->state != 1) { pi->state = 1; pi->frame = 0; }
+        }
+        pi->drag_speed = (float)(dx < 0 ? -dx : dx) / (float)dt;
+
+        SetWindowPos(hwnd, NULL, new_x, new_y, 0, 0,
+            SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+        return 0;
+    }
+    case WM_LBUTTONUP: {
+        if (!pi || !pi->dragging) return 0;
+        pi->dragging = 0;
+        ReleaseCapture();
+        pi->state = 0;
+        pi->frame = 0;
+        pi->drag_speed = 0.0f;
+        pi->next_tick = GetTickCount() + g_frame_durations[0][0];
+        /* render idle frame immediately */
+        render_frame_to_buffer(pi->pet, 0, 0, pi->dib_pixels);
+        present_buffer(hwnd, pi->memdc);
         return 0;
     }
     case WM_TIMER: {
@@ -405,7 +465,18 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         if (now >= pi->next_tick) {
             pi->frame++;
             if (pi->frame >= g_frame_counts[pi->state]) pi->frame = 0;
-            pi->next_tick = now + g_frame_durations[pi->state][pi->frame];
+
+            int base = g_frame_durations[pi->state][pi->frame];
+            int adj = base;
+            if (pi->dragging) {
+                float eff = pi->drag_speed;
+                if (now - pi->last_drag_tick > 50) eff = 0.0f;
+                float factor = 1.0f + eff * 3.0f;
+                adj = (int)(base / factor);
+                if (adj < 15) adj = 15;
+            }
+            pi->next_tick = now + adj;
+
             int sx = pi->frame * CELL_W;
             int sy = pi->state * CELL_H;
             render_frame_to_buffer(pi->pet, sx, sy, pi->dib_pixels);
