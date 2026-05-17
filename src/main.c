@@ -96,11 +96,11 @@ static void json_copy_str(const char *src, char *dst, int max)
 }
 
 /* ---------- directory scan ---------- */
-static void wcat(wchar_t *dst, const wchar_t *src)
+static void wcat(wchar_t *dst, const wchar_t *src, int max)
 {
     int d = (int)wcslen(dst);
     int s = 0;
-    while (src[s] && d < MAX_PATH - 1)
+    while (src[s] && d < max - 1)
         dst[d++] = src[s++];
     dst[d] = 0;
 }
@@ -117,7 +117,7 @@ static void scan_pets(void)
     WIN32_FIND_DATAW fd;
     wchar_t search[MAX_PATH];
     wcscpy(search, g_base_dir);
-    wcat(search, L"my-pet\\*");
+    wcat(search, L"my-pet\\*", MAX_PATH);
     HANDLE h = FindFirstFileW(search, &fd);
     if (h == INVALID_HANDLE_VALUE) return;
     do {
@@ -125,9 +125,9 @@ static void scan_pets(void)
             wcscmp(fd.cFileName, L".") != 0 && wcscmp(fd.cFileName, L"..") != 0) {
             wchar_t json_path[MAX_PATH];
             wcscpy(json_path, g_base_dir);
-            wcat(json_path, L"my-pet\\");
-            wcat(json_path, fd.cFileName);
-            wcat(json_path, L"\\pet.json");
+            wcat(json_path, L"my-pet\\", MAX_PATH);
+            wcat(json_path, fd.cFileName, MAX_PATH);
+            wcat(json_path, L"\\pet.json", MAX_PATH);
 
             HANDLE fh = CreateFileW(json_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
             if (fh != INVALID_HANDLE_VALUE) {
@@ -161,10 +161,10 @@ static void scan_pets(void)
                     else { wcscpy(sprite_name, L"spritesheet.webp"); }
 
                     wcscpy(p->sprite_path, g_base_dir);
-                    wcat(p->sprite_path, L"my-pet\\");
-                    wcat(p->sprite_path, fd.cFileName);
-                    wcat(p->sprite_path, L"\\");
-                    wcat(p->sprite_path, sprite_name);
+                    wcat(p->sprite_path, L"my-pet\\", MAX_PATH);
+                    wcat(p->sprite_path, fd.cFileName, MAX_PATH);
+                    wcat(p->sprite_path, L"\\", MAX_PATH);
+                    wcat(p->sprite_path, sprite_name, MAX_PATH);
 
                     g_app.pet_count++;
                     free(buf);
