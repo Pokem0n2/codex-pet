@@ -25,6 +25,19 @@
 
 static const int g_frame_counts[ROWS] = {6, 8, 8, 4, 5, 8, 6, 6, 6};
 
+/* per-frame durations (ms) from hatch-pet/scripts/render_animation_previews.py */
+static const int g_frame_durations[ROWS][8] = {
+    {280, 110, 110, 140, 140, 320,   0,   0}, /* idle          */
+    {120, 120, 120, 120, 120, 120, 120, 220}, /* running-right */
+    {120, 120, 120, 120, 120, 120, 120, 220}, /* running-left  */
+    {140, 140, 140, 280,   0,   0,   0,   0}, /* waving        */
+    {140, 140, 140, 140, 280,   0,   0,   0}, /* jumping       */
+    {140, 140, 140, 140, 140, 140, 140, 240}, /* failed        */
+    {150, 150, 150, 150, 150, 260,   0,   0}, /* waiting       */
+    {120, 120, 120, 120, 120, 220,   0,   0}, /* running       */
+    {150, 150, 150, 150, 150, 280,   0,   0}, /* review        */
+};
+
 /* ---------- data ---------- */
 typedef struct Pet {
     wchar_t id[64];
@@ -316,7 +329,7 @@ static void update_preview(void)
         g_app.preview_state++;
         if (g_app.preview_state >= ROWS) g_app.preview_state = 0;
     }
-    g_app.preview_next = now + 150;
+    g_app.preview_next = now + g_frame_durations[g_app.preview_state][g_app.preview_frame];
 
     int sx = g_app.preview_frame * CELL_W;
     int sy = g_app.preview_state * CELL_H;
@@ -382,7 +395,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)pi);
         pi->hwnd = hwnd;
         ensure_buffer(pi);
-        pi->next_tick = GetTickCount() + 150;
+        pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         SetTimer(hwnd, IDT_PET, 30, NULL);
         return 0;
     }
@@ -392,7 +405,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         if (now >= pi->next_tick) {
             pi->frame++;
             if (pi->frame >= g_frame_counts[pi->state]) pi->frame = 0;
-            pi->next_tick = now + 150;
+            pi->next_tick = now + g_frame_durations[pi->state][pi->frame];
             int sx = pi->frame * CELL_W;
             int sy = pi->state * CELL_H;
             render_frame_to_buffer(pi->pet, sx, sy, pi->dib_pixels);
@@ -421,7 +434,7 @@ static void on_sel_change(int idx)
     SetWindowTextW(g_app.desc_label, g_app.pets[idx].desc);
     g_app.preview_state = 0;
     g_app.preview_frame = 0;
-    g_app.preview_next = GetTickCount() + 150;
+    g_app.preview_next = GetTickCount() + g_frame_durations[0][0];
     /* clear preview buffer to avoid cross-pet ghosting */
     if (g_app.prev_pixels)
         memset(g_app.prev_pixels, 0, CELL_W * CELL_H * 4);
