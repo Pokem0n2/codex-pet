@@ -1,0 +1,7 @@
+*.exe
+*.o
+*.obj
+test_screenshot.png
+run.log
+debug_*
+cpw/.git
