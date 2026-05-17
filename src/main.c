@@ -422,6 +422,14 @@ static void on_sel_change(int idx)
     g_app.preview_state = 0;
     g_app.preview_frame = 0;
     g_app.preview_next = GetTickCount() + 150;
+    /* clear preview buffer to avoid cross-pet ghosting */
+    if (g_app.prev_pixels)
+        memset(g_app.prev_pixels, 0, CELL_W * CELL_H * 4);
+    /* force redraw */
+    if (g_app.selector) {
+        RECT rc = {190, 10, 190 + CELL_W, 10 + CELL_H};
+        InvalidateRect(g_app.selector, &rc, TRUE);
+    }
 }
 
 static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
@@ -445,6 +453,11 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         if (g_app.pet_count > 0) {
             SendMessageW(g_app.listbox, LB_SETCURSEL, 0, 0);
             on_sel_change(0);
+            /* force first preview draw */
+            {
+                RECT rc = {190, 10, 190 + CELL_W, 10 + CELL_H};
+                InvalidateRect(hwnd, &rc, TRUE);
+            }
         }
         return 0;
     }
@@ -459,9 +472,15 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             InvalidateRect(hwnd, &rc, FALSE);
         }
         return 0;
+    case WM_ERASEBKGND:
+        /* 默认背景绘制交给 DefWindowProc，但预览区域我们自行管理 */
+        return DefWindowProcW(hwnd, msg, w, l);
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
+        /* 先清空预览区背景，防止旧帧残留 */
+        RECT rc_preview = {190, 10, 190 + CELL_W, 10 + CELL_H};
+        FillRect(hdc, &rc_preview, (HBRUSH)(COLOR_BTNFACE + 1));
         if (g_app.selected >= 0 && g_app.selected < g_app.pet_count && g_app.prev_memdc) {
             BLENDFUNCTION bf = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
             AlphaBlend(hdc, 190, 10, CELL_W, CELL_H, g_app.prev_memdc, 0, 0, CELL_W, CELL_H, bf);
