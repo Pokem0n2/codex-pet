@@ -577,6 +577,19 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             needs_render = 1;
         }
 
+        /* temp running-left/right movement */
+        if (pi->temp_anim && (pi->state == 1 || pi->state == 2)) {
+            int speed = 2;
+            if (pi->state == 1) pi->x += speed;
+            else pi->x -= speed;
+            int sw = GetSystemMetrics(SM_CXSCREEN);
+            if (pi->x < 0) pi->x = 0;
+            if (pi->x > sw - PET_W) pi->x = sw - PET_W;
+            SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
+                SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+            needs_render = 1;
+        }
+
         if (now >= pi->next_tick) {
             pi->frame++;
             if (pi->frame >= g_frame_counts[pi->state]) {
@@ -797,8 +810,25 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
             case 'E':      target = 5; break; /* failed  */
             case 'Q':      target = 6; break; /* waiting */
             case 'R':      target = 8; break; /* review  */
+            case VK_LEFT:  target = 2; break; /* running-left  */
+            case VK_RIGHT: target = 1; break; /* running-right */
             }
             if (target >= 0 && g_focused_pet) {
+                /* Arrow keys only control pet when focus is actually on a pet window */
+                if (msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT) {
+                    HWND focus = GetFocus();
+                    int on_pet = 0;
+                    if (focus) {
+                        wchar_t cn[64];
+                        GetClassNameW(focus, cn, 64);
+                        on_pet = (wcscmp(cn, L"PetWindow") == 0);
+                    }
+                    if (!on_pet) {
+                        TranslateMessage(&msg);
+                        DispatchMessage(&msg);
+                        continue;
+                    }
+                }
                 pet_trigger_anim(g_focused_pet, target);
                 continue;
             }
