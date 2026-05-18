@@ -71,6 +71,7 @@ typedef struct PetInst {
     int last_drag_x;
     DWORD last_drag_tick;
     float drag_speed;
+    int temp_anim;
 } PetInst;
 
 typedef struct {
@@ -420,6 +421,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)pi);
         pi->hwnd = hwnd;
         ensure_buffer(pi);
+        pi->temp_anim = 0;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         SetTimer(hwnd, IDT_PET, 16, NULL);
         return 0;
@@ -457,9 +459,9 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
         /* direction: only horizontal component matters */
         if (dx < 0) {
-            if (pi->state != 2) { pi->state = 2; pi->frame = 0; }
+            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; }
         } else if (dx > 0) {
-            if (pi->state != 1) { pi->state = 1; pi->frame = 0; }
+            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; }
         }
         pi->drag_speed = (float)(dx < 0 ? -dx : dx) / (float)dt;
 
@@ -490,6 +492,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         ReleaseCapture();
         pi->state = 0;
         pi->frame = 0;
+        pi->temp_anim = 0;
         pi->drag_speed = 0.0f;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         /* render idle frame immediately */
@@ -497,12 +500,40 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         present_buffer(hwnd, pi->memdc);
         return 0;
     }
+    case WM_KEYDOWN: {
+        if (!pi) return 0;
+        int target = -1;
+        switch (w) {
+        case VK_SPACE: target = 4; break; /* jumping */
+        case 'W':      target = 3; break; /* waving  */
+        case 'E':      target = 5; break; /* failed  */
+        case 'Q':      target = 6; break; /* waiting */
+        case 'R':      target = 8; break; /* review  */
+        }
+        if (target >= 0) {
+            pi->state = target;
+            pi->frame = 0;
+            pi->temp_anim = 1;
+            pi->next_tick = GetTickCount() + g_frame_durations[target][0];
+            render_scaled_frame_to(pi->pet, 0, target * CELL_H, pi->dib_pixels, PET_W, PET_H);
+            present_buffer(hwnd, pi->memdc);
+        }
+        return 0;
+    }
     case WM_TIMER: {
         if (!pi || !pi->alive || !pi->pet || !pi->pet->pixels) return 0;
         DWORD now = GetTickCount();
         if (now >= pi->next_tick) {
             pi->frame++;
-            if (pi->frame >= g_frame_counts[pi->state]) pi->frame = 0;
+            if (pi->frame >= g_frame_counts[pi->state]) {
+                if (pi->temp_anim) {
+                    pi->state = 0;
+                    pi->temp_anim = 0;
+                    pi->frame = 0;
+                } else {
+                    pi->frame = 0;
+                }
+            }
 
             int base = g_frame_durations[pi->state][pi->frame];
             int adj = base;
