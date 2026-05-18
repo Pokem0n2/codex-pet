@@ -396,7 +396,7 @@ static void spawn_pet(void)
 
     /* render first frame immediately */
     ensure_buffer(pi);
-    render_frame_to_buffer(p, 0, 0, pi->dib_pixels);
+    render_scaled_frame(p, 0, 0, pi->dib_pixels);
     present_buffer(hwnd, pi->memdc);
 }
 
@@ -491,7 +491,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->drag_speed = 0.0f;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         /* render idle frame immediately */
-        render_frame_to_buffer(pi->pet, 0, 0, pi->dib_pixels);
+        render_scaled_frame(pi->pet, 0, 0, pi->dib_pixels);
         present_buffer(hwnd, pi->memdc);
         return 0;
     }
@@ -515,7 +515,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
             int sx = pi->frame * CELL_W;
             int sy = pi->state * CELL_H;
-            render_frame_to_buffer(pi->pet, sx, sy, pi->dib_pixels);
+            render_scaled_frame(pi->pet, sx, sy, pi->dib_pixels);
             present_buffer(hwnd, pi->memdc);
         }
         return 0;
