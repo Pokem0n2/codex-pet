@@ -584,6 +584,7 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
                 InvalidateRect(hwnd, &rc, TRUE);
             }
         }
+        SetFocus(g_app.listbox);
         return 0;
     }
     case WM_COMMAND:
