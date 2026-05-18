@@ -430,6 +430,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
     }
     case WM_LBUTTONDOWN: {
         if (!pi) return 0;
+        SetFocus(hwnd);
         SetCapture(hwnd);
         pi->dragging = 1;
         POINT pt;
@@ -691,6 +692,15 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                 continue;
             }
             if (msg.wParam == VK_ESCAPE) {
+                HWND focus = GetFocus();
+                if (focus) {
+                    wchar_t cn[64];
+                    GetClassNameW(focus, cn, 64);
+                    if (wcscmp(cn, L"PetWindow") == 0) {
+                        DestroyWindow(focus);
+                        continue;
+                    }
+                }
                 destroy_all_pets();
                 PostQuitMessage(0);
                 break;
