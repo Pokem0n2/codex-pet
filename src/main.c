@@ -507,6 +507,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
         pi->x = new_x;
         pi->y = new_y;
+        if (pi->y < 0) pi->y = 0;
         pi->last_drag_x = new_x;
         pi->last_drag_tick = now;
 
@@ -565,6 +566,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         if (pi->jump_active) {
             pi->jump_vy += 0.6f;
             pi->y += (int)pi->jump_vy;
+            if (pi->y < 0) pi->y = 0;
             if (pi->y >= pi->jump_origin_y) {
                 pi->y = pi->jump_origin_y;
                 pi->jump_active = 0;
