@@ -18,6 +18,8 @@
 #define CELL_H          208
 #define PET_W           48
 #define PET_H           52
+#define PREV_W          96
+#define PREV_H          104
 #define COLS            8
 #define ROWS            9
 
@@ -312,16 +314,16 @@ static void render_frame_to_buffer(Pet *pet, int fx, int fy, BYTE *dst)
     }
 }
 
-static void render_scaled_frame(Pet *pet, int fx, int fy, BYTE *dst)
+static void render_scaled_frame_to(Pet *pet, int fx, int fy, BYTE *dst, int dw, int dh)
 {
     BYTE src[CELL_W * CELL_H * 4];
     render_frame_to_buffer(pet, fx, fy, src);
-    for (int dy = 0; dy < PET_H; dy++) {
-        int sy = dy * 4;
-        for (int dx = 0; dx < PET_W; dx++) {
-            int sx = dx * 4;
+    for (int dy = 0; dy < dh; dy++) {
+        int sy = (dy * CELL_H) / dh;
+        for (int dx = 0; dx < dw; dx++) {
+            int sx = (dx * CELL_W) / dw;
             for (int c = 0; c < 4; c++) {
-                dst[(dy * PET_W + dx) * 4 + c] = src[(sy * CELL_W + sx) * 4 + c];
+                dst[(dy * dw + dx) * 4 + c] = src[(sy * CELL_W + sx) * 4 + c];
             }
         }
     }
@@ -357,7 +359,7 @@ static void update_preview(void)
 
     int sx = g_app.preview_frame * CELL_W;
     int sy = g_app.preview_state * CELL_H;
-    render_scaled_frame(p, sx, sy, g_app.prev_pixels);
+    render_scaled_frame_to(p, sx, sy, g_app.prev_pixels, PREV_W, PREV_H);
     present_buffer(g_app.preview, g_app.prev_memdc);
 }
 
@@ -396,7 +398,7 @@ static void spawn_pet(void)
 
     /* render first frame immediately */
     ensure_buffer(pi);
-    render_scaled_frame(p, 0, 0, pi->dib_pixels);
+    render_scaled_frame_to(p, 0, 0, pi->dib_pixels, PET_W, PET_H);
     present_buffer(hwnd, pi->memdc);
 }
 
@@ -478,7 +480,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         }
         int sx = pi->frame * CELL_W;
         int sy = pi->state * CELL_H;
-        render_scaled_frame(pi->pet, sx, sy, pi->dib_pixels);
+        render_scaled_frame_to(pi->pet, sx, sy, pi->dib_pixels, PET_W, PET_H);
         present_buffer(hwnd, pi->memdc);
         return 0;
     }
@@ -491,7 +493,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->drag_speed = 0.0f;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         /* render idle frame immediately */
-        render_scaled_frame(pi->pet, 0, 0, pi->dib_pixels);
+        render_scaled_frame_to(pi->pet, 0, 0, pi->dib_pixels, PET_W, PET_H);
         present_buffer(hwnd, pi->memdc);
         return 0;
     }
@@ -515,7 +517,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
             int sx = pi->frame * CELL_W;
             int sy = pi->state * CELL_H;
-            render_scaled_frame(pi->pet, sx, sy, pi->dib_pixels);
+            render_scaled_frame_to(pi->pet, sx, sy, pi->dib_pixels, PET_W, PET_H);
             present_buffer(hwnd, pi->memdc);
         }
         return 0;
@@ -544,10 +546,10 @@ static void on_sel_change(int idx)
     g_app.preview_next = GetTickCount() + g_frame_durations[0][0];
     /* clear preview buffer to avoid cross-pet ghosting */
     if (g_app.prev_pixels)
-        memset(g_app.prev_pixels, 0, PET_W * PET_H * 4);
+        memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
     /* force redraw */
     if (g_app.selector) {
-        RECT rc = {190, 10, 190 + PET_W, 10 + PET_H};
+        RECT rc = {190, 10, 190 + PREV_W, 10 + PREV_H};
         InvalidateRect(g_app.selector, &rc, TRUE);
     }
 }
@@ -575,7 +577,7 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             on_sel_change(0);
             /* force first preview draw */
             {
-                RECT rc = {190, 10, 190 + PET_W, 10 + PET_H};
+                RECT rc = {190, 10, 190 + PREV_W, 10 + PREV_H};
                 InvalidateRect(hwnd, &rc, TRUE);
             }
         }
@@ -588,7 +590,7 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
     case WM_TIMER:
         update_preview();
         {
-            RECT rc = {190, 10, 190 + PET_W, 10 + PET_H};
+            RECT rc = {190, 10, 190 + PREV_W, 10 + PREV_H};
             InvalidateRect(hwnd, &rc, FALSE);
         }
         return 0;
@@ -599,11 +601,11 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
         /* 先清空预览区背景，防止旧帧残留 */
-        RECT rc_preview = {190, 10, 190 + PET_W, 10 + PET_H};
+        RECT rc_preview = {190, 10, 190 + PREV_W, 10 + PREV_H};
         FillRect(hdc, &rc_preview, (HBRUSH)(COLOR_BTNFACE + 1));
         if (g_app.selected >= 0 && g_app.selected < g_app.pet_count && g_app.prev_memdc) {
             BLENDFUNCTION bf = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
-            AlphaBlend(hdc, 190, 10, PET_W, PET_H, g_app.prev_memdc, 0, 0, PET_W, PET_H, bf);
+            AlphaBlend(hdc, 190, 10, PREV_W, PREV_H, g_app.prev_memdc, 0, 0, PREV_W, PREV_H, bf);
         }
         EndPaint(hwnd, &ps);
         return 0;
@@ -644,8 +646,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
         HDC screen = GetDC(NULL);
         BITMAPINFO bmi = {0};
         bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmi.bmiHeader.biWidth = PET_W;
-        bmi.bmiHeader.biHeight = -PET_H;
+        bmi.bmiHeader.biWidth = PREV_W;
+        bmi.bmiHeader.biHeight = -PREV_H;
         bmi.bmiHeader.biPlanes = 1;
         bmi.bmiHeader.biBitCount = 32;
         bmi.bmiHeader.biCompression = BI_RGB;
