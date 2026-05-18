@@ -77,6 +77,9 @@ typedef struct PetInst {
     int jump_count;
     int jump_origin_y;
     float jump_vy;
+    /* directional run movement */
+    int move_dx;
+    int move_dy;
 } PetInst;
 
 typedef struct {
@@ -404,6 +407,8 @@ static void pet_trigger_anim(HWND hwnd, int target)
         pi->jump_active = 0;
         pi->jump_count = 0;
         pi->jump_vy = 0.0f;
+        pi->move_dx = 0;
+        pi->move_dy = 0;
     }
     pi->next_tick = GetTickCount() + g_frame_durations[target][0];
     render_scaled_frame_to(pi->pet, 0, target * CELL_H, pi->dib_pixels, PET_W, PET_H);
@@ -494,6 +499,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->jump_active = 0;
         pi->jump_count = 0;
         pi->jump_vy = 0.0f;
+        pi->move_dx = 0;
+        pi->move_dy = 0;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         SetTimer(hwnd, IDT_PET, 16, NULL);
         return 0;
@@ -533,9 +540,9 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
         /* direction: only horizontal component matters */
         if (dx < 0) {
-            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; }
+            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
         } else if (dx > 0) {
-            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; }
+            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
         }
         pi->drag_speed = (float)(dx < 0 ? -dx : dx) / (float)dt;
 
@@ -570,6 +577,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->jump_active = 0;
         pi->jump_count = 0;
         pi->jump_vy = 0.0f;
+        pi->move_dx = 0;
+        pi->move_dy = 0;
         pi->drag_speed = 0.0f;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         /* render idle frame immediately */
@@ -599,17 +608,28 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             needs_render = 1;
         }
 
-        /* temp running-left/right movement */
+        /* temp running movement (horizontal or vertical) */
         if (pi->temp_anim && (pi->state == 1 || pi->state == 2)) {
-            int speed = 2;
-            if (pi->state == 1) pi->x += speed;
-            else pi->x -= speed;
-            int sw = GetSystemMetrics(SM_CXSCREEN);
-            if (pi->x < 0) pi->x = 0;
-            if (pi->x > sw - PET_W) pi->x = sw - PET_W;
-            SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
-                SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
-            needs_render = 1;
+            int moved = 0;
+            if (pi->move_dx != 0) {
+                pi->x += pi->move_dx;
+                int sw = GetSystemMetrics(SM_CXSCREEN);
+                if (pi->x < 0) pi->x = 0;
+                if (pi->x > sw - PET_W) pi->x = sw - PET_W;
+                moved = 1;
+            }
+            if (pi->move_dy != 0) {
+                pi->y += pi->move_dy;
+                int sh = GetSystemMetrics(SM_CYSCREEN);
+                if (pi->y < 0) pi->y = 0;
+                if (pi->y > sh - PET_H) pi->y = sh - PET_H;
+                moved = 1;
+            }
+            if (moved) {
+                SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
+                    SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+                needs_render = 1;
+            }
         }
 
         if (now >= pi->next_tick) {
@@ -817,7 +837,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         if (msg.message == WM_KEYUP) {
-            if ((msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT) && g_focused_pet) {
+            if ((msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT ||
+                 msg.wParam == VK_UP   || msg.wParam == VK_DOWN) && g_focused_pet) {
                 PetInst *pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
                 if (pi && pi->alive && pi->temp_anim && (pi->state == 1 || pi->state == 2)) {
                     pi->state = 0;
@@ -858,10 +879,22 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
             case 'R':      target = 8; break; /* review  */
             case VK_LEFT:  target = 2; break; /* running-left  */
             case VK_RIGHT: target = 1; break; /* running-right */
+            case VK_UP:
+            case VK_DOWN: {
+                if (g_focused_pet) {
+                    PetInst *pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
+                    if (pi) {
+                        int sw = GetSystemMetrics(SM_CXSCREEN);
+                        target = (pi->x <= sw / 2) ? 1 : 2;
+                    }
+                }
+                break;
+            }
             }
             if (target >= 0 && g_focused_pet) {
                 /* Arrow keys only control pet when focus is actually on a pet window */
-                if (msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT) {
+                if (msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT ||
+                    msg.wParam == VK_UP   || msg.wParam == VK_DOWN) {
                     HWND focus = GetFocus();
                     int on_pet = 0;
                     if (focus) {
@@ -880,6 +913,19 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                    Other temp anims skip re-trigger if already playing same state. */
                 if (!pi || !pi->alive || !pi->temp_anim || pi->state != target || target == 4) {
                     pet_trigger_anim(g_focused_pet, target);
+                }
+                /* Set movement direction for running-left/right */
+                if (target == 1 || target == 2) {
+                    pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
+                    if (pi) {
+                        if (msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT) {
+                            pi->move_dx = (target == 1) ? 2 : -2;
+                            pi->move_dy = 0;
+                        } else if (msg.wParam == VK_UP || msg.wParam == VK_DOWN) {
+                            pi->move_dx = 0;
+                            pi->move_dy = (msg.wParam == VK_UP) ? -2 : 2;
+                        }
+                    }
                 }
                 continue;
             }
