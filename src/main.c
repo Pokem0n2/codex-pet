@@ -357,7 +357,7 @@ static void update_preview(void)
 
     int sx = g_app.preview_frame * CELL_W;
     int sy = g_app.preview_state * CELL_H;
-    render_frame_to_buffer(p, sx, sy, g_app.prev_pixels);
+    render_scaled_frame(p, sx, sy, g_app.prev_pixels);
     present_buffer(g_app.preview, g_app.prev_memdc);
 }
 
