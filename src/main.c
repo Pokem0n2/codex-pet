@@ -394,12 +394,15 @@ static void spawn_pet(void)
     if (!hwnd) { pi->alive = 0; return; }
 
     g_app.instance_count++;
-    ShowWindow(hwnd, SW_SHOW);
+    ShowWindow(hwnd, SW_SHOWNOACTIVATE);
 
     /* render first frame immediately */
     ensure_buffer(pi);
     render_scaled_frame_to(p, 0, 0, pi->dib_pixels, PET_W, PET_H);
     present_buffer(hwnd, pi->memdc);
+
+    /* keep focus on selector so user can rapid-fire Enter */
+    SetFocus(g_app.selector);
 }
 
 static void destroy_all_pets(void)
