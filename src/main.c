@@ -829,7 +829,10 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                         continue;
                     }
                 }
-                pet_trigger_anim(g_focused_pet, target);
+                PetInst *pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
+                if (!pi || !pi->alive || !pi->temp_anim || pi->state != target) {
+                    pet_trigger_anim(g_focused_pet, target);
+                }
                 continue;
             }
         }
