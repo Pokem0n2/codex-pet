@@ -358,12 +358,12 @@ static void update_preview(void)
 
     g_app.preview_frame++;
     if (g_app.preview_frame >= g_frame_counts[7]) g_app.preview_frame = 0;
-    g_app.preview_next = now + g_frame_durations[7][g_app.preview_frame];
+    g_app.preview_next = now + 100;
 
     int sx = g_app.preview_frame * CELL_W;
     int sy = 7 * CELL_H;
+    memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
     render_scaled_frame_to(p, sx, sy, g_app.prev_pixels, PREV_W, PREV_H);
-    present_buffer(g_app.preview, g_app.prev_memdc);
 }
 
 /* ---------- pet instance management ---------- */
@@ -672,10 +672,15 @@ static void on_sel_change(int idx)
     SetWindowTextW(g_app.desc_label, g_app.pets[idx].desc);
     g_app.preview_state = 7;
     g_app.preview_frame = 0;
-    g_app.preview_next = GetTickCount() + g_frame_durations[7][0];
-    /* clear preview buffer to avoid cross-pet ghosting */
-    if (g_app.prev_pixels)
+    g_app.preview_next = GetTickCount() + 100;
+    /* render first frame immediately to avoid blank period */
+    if (g_app.prev_pixels) {
         memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
+        Pet *p = &g_app.pets[idx];
+        if (p && p->pixels) {
+            render_scaled_frame_to(p, 0, 7 * CELL_H, g_app.prev_pixels, PREV_W, PREV_H);
+        }
+    }
     /* force redraw */
     if (g_app.selector) {
         RECT rc = {190, 10, 190 + PREV_W, 10 + PREV_H};
