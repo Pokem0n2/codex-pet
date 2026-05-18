@@ -74,6 +74,7 @@ typedef struct PetInst {
     int temp_anim;
     /* jump physics */
     int jump_active;
+    int jump_count;
     int jump_origin_y;
     float jump_vy;
 } PetInst;
@@ -370,6 +371,10 @@ static void pet_trigger_anim(HWND hwnd, int target)
 {
     PetInst *pi = (PetInst *)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
     if (!pi || !pi->alive || !pi->pet || !pi->pet->pixels) return;
+    if (target == 4 && pi->jump_active && pi->jump_count >= 2) {
+        /* max double jump reached, ignore additional presses */
+        return;
+    }
     if (pi->jump_active && target != 4) {
         pi->y = pi->jump_origin_y;
         SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
@@ -379,11 +384,25 @@ static void pet_trigger_anim(HWND hwnd, int target)
     pi->frame = 0;
     pi->temp_anim = 1;
     if (target == 4) {
-        pi->jump_active = 1;
-        pi->jump_origin_y = pi->y;
-        pi->jump_vy = -12.0f;
+        if (pi->jump_active) {
+            /* double jump boost */
+            pi->jump_count = 2;
+            pi->jump_vy = -12.3f;
+        } else {
+            /* first jump */
+            pi->jump_active = 1;
+            pi->jump_count = 1;
+            pi->jump_origin_y = pi->y;
+            pi->jump_vy = -10.1f;
+        }
     } else {
+        if (pi->jump_active) {
+            pi->y = pi->jump_origin_y;
+            SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
+                SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
         pi->jump_active = 0;
+        pi->jump_count = 0;
         pi->jump_vy = 0.0f;
     }
     pi->next_tick = GetTickCount() + g_frame_durations[target][0];
@@ -473,6 +492,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         ensure_buffer(pi);
         pi->temp_anim = 0;
         pi->jump_active = 0;
+        pi->jump_count = 0;
         pi->jump_vy = 0.0f;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         SetTimer(hwnd, IDT_PET, 16, NULL);
@@ -513,9 +533,9 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
         /* direction: only horizontal component matters */
         if (dx < 0) {
-            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_vy = 0.0f; }
+            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; }
         } else if (dx > 0) {
-            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_vy = 0.0f; }
+            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; }
         }
         pi->drag_speed = (float)(dx < 0 ? -dx : dx) / (float)dt;
 
@@ -548,6 +568,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->frame = 0;
         pi->temp_anim = 0;
         pi->jump_active = 0;
+        pi->jump_count = 0;
         pi->jump_vy = 0.0f;
         pi->drag_speed = 0.0f;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
@@ -570,6 +591,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             if (pi->y >= pi->jump_origin_y) {
                 pi->y = pi->jump_origin_y;
                 pi->jump_active = 0;
+                pi->jump_count = 0;
                 pi->jump_vy = 0.0f;
             }
             SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
