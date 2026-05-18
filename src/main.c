@@ -871,7 +871,9 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                     }
                 }
                 PetInst *pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
-                if (!pi || !pi->alive || !pi->temp_anim || pi->state != target) {
+                /* Jumping (target==4) always calls through to allow double-jump.
+                   Other temp anims skip re-trigger if already playing same state. */
+                if (!pi || !pi->alive || !pi->temp_anim || pi->state != target || target == 4) {
                     pet_trigger_anim(g_focused_pet, target);
                 }
                 continue;
