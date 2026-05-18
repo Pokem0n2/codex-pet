@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 /* ---------- constants ---------- */
 #define MAX_PETS        64
@@ -26,6 +27,23 @@
 #define IDC_LISTBOX     100
 #define IDT_PREVIEW     1
 #define IDT_PET         2
+
+#define AI_TIMEOUT      10000
+#define AI_MIN_ACTION   3000
+#define AI_MAX_ACTION   10000
+
+#define TRAJ_LINE       0
+#define TRAJ_RECT       1
+#define TRAJ_TRI        2
+#define TRAJ_POLY       3
+#define TRAJ_CIRCLE     4
+#define TRAJ_ELLIPSE    5
+#define TRAJ_FIGURE8    6
+#define TRAJ_ARC        7
+#define TRAJ_ZIGZAG     8
+#define TRAJ_CYCLE      9
+
+#define PI 3.14159265f
 
 static const int g_frame_counts[ROWS] = {6, 8, 8, 4, 5, 8, 6, 6, 6};
 
@@ -80,6 +98,15 @@ typedef struct PetInst {
     /* directional run movement */
     int move_dx;
     int move_dy;
+    /* AI state */
+    int ai_active;
+    DWORD ai_last_interaction;
+    DWORD ai_next_action;
+    int ai_traj_type;
+    float ai_traj_t;
+    float ai_traj_speed;
+    int ai_p1;
+    int ai_p2;
 } PetInst;
 
 typedef struct {
@@ -415,6 +442,129 @@ static void pet_trigger_anim(HWND hwnd, int target)
     present_buffer(hwnd, pi->memdc);
 }
 
+static void ai_update_pos(PetInst *pi)
+{
+    pi->ai_traj_t += pi->ai_traj_speed;
+    if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
+
+    float nx = 0.5f, ny = 0.5f;
+    float t = pi->ai_traj_t;
+
+    switch (pi->ai_traj_type) {
+    case TRAJ_LINE:
+        nx = t;
+        ny = 0.3f + t * 0.4f;
+        break;
+    case TRAJ_RECT:
+        {
+            float lt = t * 4.0f;
+            int side = (int)lt;
+            float f = lt - side;
+            if (side == 0) { nx = f; ny = 0.0f; }
+            else if (side == 1) { nx = 1.0f; ny = f; }
+            else if (side == 2) { nx = 1.0f - f; ny = 1.0f; }
+            else { nx = 0.0f; ny = 1.0f - f; }
+        }
+        break;
+    case TRAJ_TRI:
+        {
+            float lt = t * 3.0f;
+            int side = (int)lt;
+            float f = lt - side;
+            if (side == 0) { nx = 0.5f + f * 0.5f; ny = f; }
+            else if (side == 1) { nx = 1.0f - f * 0.5f; ny = 1.0f - f * 0.5f; }
+            else { nx = f * 0.5f; ny = 0.5f + f * 0.5f; }
+        }
+        break;
+    case TRAJ_POLY:
+        {
+            int n = 3 + (pi->ai_p1 % 5);
+            float lt = t * n;
+            int side = (int)lt;
+            float f = lt - side;
+            float a1 = side * 2.0f * PI / n;
+            float a2 = (side + 1) * 2.0f * PI / n;
+            float vx1 = 0.5f + 0.5f * cosf(a1);
+            float vy1 = 0.5f + 0.5f * sinf(a1);
+            float vx2 = 0.5f + 0.5f * cosf(a2);
+            float vy2 = 0.5f + 0.5f * sinf(a2);
+            nx = vx1 + (vx2 - vx1) * f;
+            ny = vy1 + (vy2 - vy1) * f;
+        }
+        break;
+    case TRAJ_CIRCLE:
+        {
+            float a = t * 2.0f * PI;
+            nx = 0.5f + 0.5f * cosf(a);
+            ny = 0.5f + 0.5f * sinf(a);
+        }
+        break;
+    case TRAJ_ELLIPSE:
+        {
+            float a = t * 2.0f * PI;
+            nx = 0.5f + 0.5f * cosf(a);
+            ny = 0.5f + 0.3f * sinf(a);
+        }
+        break;
+    case TRAJ_FIGURE8:
+        {
+            float a = t * 2.0f * PI;
+            nx = 0.5f + 0.4f * sinf(a);
+            ny = 0.5f + 0.4f * sinf(2.0f * a);
+        }
+        break;
+    case TRAJ_ARC:
+        {
+            float a = t * PI;
+            nx = 0.5f + 0.5f * cosf(a);
+            ny = 0.5f + 0.5f * sinf(a);
+        }
+        break;
+    case TRAJ_ZIGZAG:
+        {
+            int seg = (int)(t * 8.0f);
+            float f = t * 8.0f - seg;
+            nx = (seg + f) / 8.0f;
+            ny = (seg % 2 == 0) ? f : 1.0f - f;
+        }
+        break;
+    case TRAJ_CYCLE:
+        {
+            float theta = t * 4.0f * PI;
+            nx = (theta - sinf(theta)) / (4.0f * PI);
+            ny = (1.0f - cosf(theta)) / 2.0f;
+        }
+        break;
+    }
+
+    int sw = GetSystemMetrics(SM_CXSCREEN);
+    int sh = GetSystemMetrics(SM_CYSCREEN);
+    int margin = 20;
+    pi->x = margin + (int)(nx * (sw - PET_W - 2 * margin));
+    pi->y = margin + (int)(ny * (sh - PET_H - 2 * margin));
+    SetWindowPos(pi->hwnd, NULL, pi->x, pi->y, 0, 0,
+        SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
+static void ai_pick_action(PetInst *pi, DWORD now)
+{
+    int states[] = {0, 1, 2, 3, 4, 5, 6, 8};
+    pi->state = states[rand() % 8];
+    pi->frame = 0;
+    pi->temp_anim = (pi->state >= 3 || pi->state == 1 || pi->state == 2) ? 1 : 0;
+    pi->next_tick = now + g_frame_durations[pi->state][0];
+
+    pi->ai_traj_type = rand() % 10;
+    pi->ai_traj_t = 0.0f;
+    pi->ai_traj_speed = 0.001f + (rand() % 100) / 10000.0f;
+    pi->ai_p1 = rand();
+    pi->ai_p2 = rand();
+    pi->ai_next_action = now + AI_MIN_ACTION + rand() % (AI_MAX_ACTION - AI_MIN_ACTION);
+
+    render_scaled_frame_to(pi->pet, 0, pi->state * CELL_H, pi->dib_pixels, PET_W, PET_H);
+    present_buffer(pi->hwnd, pi->memdc);
+}
+
 static void spawn_pet(void)
 {
     if (g_app.selected < 0 || g_app.selected >= g_app.pet_count) return;
@@ -501,6 +651,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->jump_vy = 0.0f;
         pi->move_dx = 0;
         pi->move_dy = 0;
+        pi->ai_active = 0;
+        pi->ai_last_interaction = GetTickCount();
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         SetTimer(hwnd, IDT_PET, 16, NULL);
         return 0;
@@ -511,6 +663,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         g_focused_pet = hwnd;
         SetCapture(hwnd);
         pi->dragging = 1;
+        pi->ai_active = 0;
+        pi->ai_last_interaction = GetTickCount();
         POINT pt;
         GetCursorPos(&pt);
         pi->drag_anchor_x = pt.x - pi->x;
@@ -630,6 +784,21 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
                     SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
                 needs_render = 1;
             }
+        }
+
+        /* AI: activate after timeout of no interaction */
+        if (!pi->dragging && !pi->ai_active) {
+            if (now - pi->ai_last_interaction > AI_TIMEOUT) {
+                pi->ai_active = 1;
+                ai_pick_action(pi, now);
+            }
+        } else if (pi->ai_active) {
+            if (now >= pi->ai_next_action) {
+                ai_pick_action(pi, now);
+                needs_render = 1;
+            }
+            ai_update_pos(pi);
+            needs_render = 1;
         }
 
         if (now >= pi->next_tick) {
@@ -909,6 +1078,10 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                     }
                 }
                 PetInst *pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
+                if (pi) {
+                    pi->ai_active = 0;
+                    pi->ai_last_interaction = GetTickCount();
+                }
                 /* Jumping (target==4) always calls through to allow double-jump.
                    Other temp anims skip re-trigger if already playing same state. */
                 if (!pi || !pi->alive || !pi->temp_anim || pi->state != target || target == 4) {
