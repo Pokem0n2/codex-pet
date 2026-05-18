@@ -16,6 +16,8 @@
 #define ATLAS_H         1872
 #define CELL_W          192
 #define CELL_H          208
+#define PET_W           96
+#define PET_H           104
 #define COLS            8
 #define ROWS            9
 
@@ -265,8 +267,8 @@ static int ensure_buffer(PetInst *pi)
     HDC screen = GetDC(NULL);
     BITMAPINFO bmi = {0};
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = CELL_W;
-    bmi.bmiHeader.biHeight = -CELL_H;
+    bmi.bmiHeader.biWidth = PET_W;
+    bmi.bmiHeader.biHeight = -PET_H;
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
@@ -310,10 +312,25 @@ static void render_frame_to_buffer(Pet *pet, int fx, int fy, BYTE *dst)
     }
 }
 
+static void render_scaled_frame(Pet *pet, int fx, int fy, BYTE *dst)
+{
+    BYTE src[CELL_W * CELL_H * 4];
+    render_frame_to_buffer(pet, fx, fy, src);
+    for (int dy = 0; dy < PET_H; dy++) {
+        int sy = dy * 2;
+        for (int dx = 0; dx < PET_W; dx++) {
+            int sx = dx * 2;
+            for (int c = 0; c < 4; c++) {
+                dst[(dy * PET_W + dx) * 4 + c] = src[(sy * CELL_W + sx) * 4 + c];
+            }
+        }
+    }
+}
+
 static void present_buffer(HWND hwnd, HDC memdc)
 {
     POINT ptSrc = {0, 0};
-    SIZE size = {CELL_W, CELL_H};
+    SIZE size = {PET_W, PET_H};
     BLENDFUNCTION bf = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
     HDC screen = GetDC(NULL);
     UpdateLayeredWindow(hwnd, screen, NULL, &size, memdc, &ptSrc, 0, &bf, ULW_ALPHA);
@@ -354,8 +371,8 @@ static void spawn_pet(void)
 
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);
-    int x = rand() % (sw - CELL_W);
-    int y = rand() % (sh - CELL_H);
+    int x = rand() % (sw - PET_W);
+    int y = rand() % (sh - PET_H);
 
     int idx = -1;
     for (int i = 0; i < MAX_INSTANCES; i++) {
@@ -371,7 +388,7 @@ static void spawn_pet(void)
     pi->alive = 1;
 
     HWND hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
-        L"PetWindow", p->name, WS_POPUP, x, y, CELL_W, CELL_H, NULL, NULL, g_app.hinst, pi);
+        L"PetWindow", p->name, WS_POPUP, x, y, PET_W, PET_H, NULL, NULL, g_app.hinst, pi);
     if (!hwnd) { pi->alive = 0; return; }
 
     g_app.instance_count++;
@@ -461,7 +478,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         }
         int sx = pi->frame * CELL_W;
         int sy = pi->state * CELL_H;
-        render_frame_to_buffer(pi->pet, sx, sy, pi->dib_pixels);
+        render_scaled_frame(pi->pet, sx, sy, pi->dib_pixels);
         present_buffer(hwnd, pi->memdc);
         return 0;
     }
