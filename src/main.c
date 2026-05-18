@@ -16,8 +16,8 @@
 #define ATLAS_H         1872
 #define CELL_W          192
 #define CELL_H          208
-#define PET_W           96
-#define PET_H           104
+#define PET_W           48
+#define PET_H           52
 #define COLS            8
 #define ROWS            9
 
@@ -317,9 +317,9 @@ static void render_scaled_frame(Pet *pet, int fx, int fy, BYTE *dst)
     BYTE src[CELL_W * CELL_H * 4];
     render_frame_to_buffer(pet, fx, fy, src);
     for (int dy = 0; dy < PET_H; dy++) {
-        int sy = dy * 2;
+        int sy = dy * 4;
         for (int dx = 0; dx < PET_W; dx++) {
-            int sx = dx * 2;
+            int sx = dx * 4;
             for (int c = 0; c < 4; c++) {
                 dst[(dy * PET_W + dx) * 4 + c] = src[(sy * CELL_W + sx) * 4 + c];
             }
@@ -544,10 +544,10 @@ static void on_sel_change(int idx)
     g_app.preview_next = GetTickCount() + g_frame_durations[0][0];
     /* clear preview buffer to avoid cross-pet ghosting */
     if (g_app.prev_pixels)
-        memset(g_app.prev_pixels, 0, CELL_W * CELL_H * 4);
+        memset(g_app.prev_pixels, 0, PET_W * PET_H * 4);
     /* force redraw */
     if (g_app.selector) {
-        RECT rc = {190, 10, 190 + CELL_W, 10 + CELL_H};
+        RECT rc = {190, 10, 190 + PET_W, 10 + PET_H};
         InvalidateRect(g_app.selector, &rc, TRUE);
     }
 }
@@ -575,7 +575,7 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             on_sel_change(0);
             /* force first preview draw */
             {
-                RECT rc = {190, 10, 190 + CELL_W, 10 + CELL_H};
+                RECT rc = {190, 10, 190 + PET_W, 10 + PET_H};
                 InvalidateRect(hwnd, &rc, TRUE);
             }
         }
@@ -588,7 +588,7 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
     case WM_TIMER:
         update_preview();
         {
-            RECT rc = {190, 10, 190 + CELL_W, 10 + CELL_H};
+            RECT rc = {190, 10, 190 + PET_W, 10 + PET_H};
             InvalidateRect(hwnd, &rc, FALSE);
         }
         return 0;
@@ -599,11 +599,11 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
         /* 先清空预览区背景，防止旧帧残留 */
-        RECT rc_preview = {190, 10, 190 + CELL_W, 10 + CELL_H};
+        RECT rc_preview = {190, 10, 190 + PET_W, 10 + PET_H};
         FillRect(hdc, &rc_preview, (HBRUSH)(COLOR_BTNFACE + 1));
         if (g_app.selected >= 0 && g_app.selected < g_app.pet_count && g_app.prev_memdc) {
             BLENDFUNCTION bf = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
-            AlphaBlend(hdc, 190, 10, CELL_W, CELL_H, g_app.prev_memdc, 0, 0, CELL_W, CELL_H, bf);
+            AlphaBlend(hdc, 190, 10, PET_W, PET_H, g_app.prev_memdc, 0, 0, PET_W, PET_H, bf);
         }
         EndPaint(hwnd, &ps);
         return 0;
@@ -644,8 +644,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
         HDC screen = GetDC(NULL);
         BITMAPINFO bmi = {0};
         bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmi.bmiHeader.biWidth = CELL_W;
-        bmi.bmiHeader.biHeight = -CELL_H;
+        bmi.bmiHeader.biWidth = PET_W;
+        bmi.bmiHeader.biHeight = -PET_H;
         bmi.bmiHeader.biPlanes = 1;
         bmi.bmiHeader.biBitCount = 32;
         bmi.bmiHeader.biCompression = BI_RGB;
