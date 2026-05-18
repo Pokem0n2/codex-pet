@@ -443,31 +443,23 @@ static void pet_trigger_anim(HWND hwnd, int target)
     present_buffer(hwnd, pi->memdc);
 }
 
-static void ai_update_pos(PetInst *pi)
+static void ai_trajectory_point(PetInst *pi, float t, float *nx, float *ny)
 {
-    /* Free movement is only allowed in running-left/right states */
-    if (pi->state != 1 && pi->state != 2) return;
-
-    pi->ai_traj_t += pi->ai_traj_speed;
-    if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
-
-    float nx = 0.5f, ny = 0.5f;
-    float t = pi->ai_traj_t;
-
+    *nx = 0.5f; *ny = 0.5f;
     switch (pi->ai_traj_type) {
     case TRAJ_LINE:
-        nx = t;
-        ny = 0.3f + t * 0.4f;
+        *nx = t;
+        *ny = 0.3f + t * 0.4f;
         break;
     case TRAJ_RECT:
         {
             float lt = t * 4.0f;
             int side = (int)lt;
             float f = lt - side;
-            if (side == 0) { nx = f; ny = 0.0f; }
-            else if (side == 1) { nx = 1.0f; ny = f; }
-            else if (side == 2) { nx = 1.0f - f; ny = 1.0f; }
-            else { nx = 0.0f; ny = 1.0f - f; }
+            if (side == 0) { *nx = f; *ny = 0.0f; }
+            else if (side == 1) { *nx = 1.0f; *ny = f; }
+            else if (side == 2) { *nx = 1.0f - f; *ny = 1.0f; }
+            else { *nx = 0.0f; *ny = 1.0f - f; }
         }
         break;
     case TRAJ_TRI:
@@ -475,9 +467,9 @@ static void ai_update_pos(PetInst *pi)
             float lt = t * 3.0f;
             int side = (int)lt;
             float f = lt - side;
-            if (side == 0) { nx = 0.5f + f * 0.5f; ny = f; }
-            else if (side == 1) { nx = 1.0f - f * 0.5f; ny = 1.0f - f * 0.5f; }
-            else { nx = f * 0.5f; ny = 0.5f + f * 0.5f; }
+            if (side == 0) { *nx = 0.5f + f * 0.5f; *ny = f; }
+            else if (side == 1) { *nx = 1.0f - f * 0.5f; *ny = 1.0f - f * 0.5f; }
+            else { *nx = f * 0.5f; *ny = 0.5f + f * 0.5f; }
         }
         break;
     case TRAJ_POLY:
@@ -492,60 +484,98 @@ static void ai_update_pos(PetInst *pi)
             float vy1 = 0.5f + 0.5f * sinf(a1);
             float vx2 = 0.5f + 0.5f * cosf(a2);
             float vy2 = 0.5f + 0.5f * sinf(a2);
-            nx = vx1 + (vx2 - vx1) * f;
-            ny = vy1 + (vy2 - vy1) * f;
+            *nx = vx1 + (vx2 - vx1) * f;
+            *ny = vy1 + (vy2 - vy1) * f;
         }
         break;
     case TRAJ_CIRCLE:
         {
             float a = t * 2.0f * PI;
-            nx = 0.5f + 0.5f * cosf(a);
-            ny = 0.5f + 0.5f * sinf(a);
+            *nx = 0.5f + 0.5f * cosf(a);
+            *ny = 0.5f + 0.5f * sinf(a);
         }
         break;
     case TRAJ_ELLIPSE:
         {
             float a = t * 2.0f * PI;
-            nx = 0.5f + 0.5f * cosf(a);
-            ny = 0.5f + 0.3f * sinf(a);
+            *nx = 0.5f + 0.5f * cosf(a);
+            *ny = 0.5f + 0.3f * sinf(a);
         }
         break;
     case TRAJ_FIGURE8:
         {
             float a = t * 2.0f * PI;
-            nx = 0.5f + 0.4f * sinf(a);
-            ny = 0.5f + 0.4f * sinf(2.0f * a);
+            *nx = 0.5f + 0.4f * sinf(a);
+            *ny = 0.5f + 0.4f * sinf(2.0f * a);
         }
         break;
     case TRAJ_ARC:
         {
             float a = t * PI;
-            nx = 0.5f + 0.5f * cosf(a);
-            ny = 0.5f + 0.5f * sinf(a);
+            *nx = 0.5f + 0.5f * cosf(a);
+            *ny = 0.5f + 0.5f * sinf(a);
         }
         break;
     case TRAJ_ZIGZAG:
         {
             int seg = (int)(t * 8.0f);
             float f = t * 8.0f - seg;
-            nx = (seg + f) / 8.0f;
-            ny = (seg % 2 == 0) ? f : 1.0f - f;
+            *nx = (seg + f) / 8.0f;
+            *ny = (seg % 2 == 0) ? f : 1.0f - f;
         }
         break;
     case TRAJ_CYCLE:
         {
             float theta = t * 4.0f * PI;
-            nx = (theta - sinf(theta)) / (4.0f * PI);
-            ny = (1.0f - cosf(theta)) / 2.0f;
+            *nx = (theta - sinf(theta)) / (4.0f * PI);
+            *ny = (1.0f - cosf(theta)) / 2.0f;
         }
         break;
     }
+}
+
+static void ai_update_pos(PetInst *pi)
+{
+    /* Free movement is only allowed in running-left/right states */
+    if (pi->state != 1 && pi->state != 2) return;
 
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);
     int margin = 20;
-    pi->x = margin + (int)(nx * (sw - PET_W - 2 * margin));
-    pi->y = margin + (int)(ny * (sh - PET_H - 2 * margin));
+    float scale_x = (float)(sw - PET_W - 2 * margin);
+    float scale_y = (float)(sh - PET_H - 2 * margin);
+
+    float t = pi->ai_traj_t;
+    float nx, ny;
+    ai_trajectory_point(pi, t, &nx, &ny);
+
+    /* Numerical derivative for tangent direction */
+    float dt = 0.0001f;
+    float nx2, ny2;
+    ai_trajectory_point(pi, t + dt, &nx2, &ny2);
+
+    float dx = (nx2 - nx) * scale_x;
+    float dy = (ny2 - ny) * scale_y;
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len < 0.001f) len = 0.001f;
+
+    /* Normalize and move exactly 2 pixels per tick */
+    dx = dx / len * 2.0f;
+    dy = dy / len * 2.0f;
+
+    pi->x += (int)(dx + 0.5f);
+    pi->y += (int)(dy + 0.5f);
+
+    /* Advance parameter t proportionally to arc length */
+    pi->ai_traj_t += dt * 2.0f / len;
+    if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
+
+    /* Clamp to screen */
+    if (pi->x < 0) pi->x = 0;
+    if (pi->x > sw - PET_W) pi->x = sw - PET_W;
+    if (pi->y < 0) pi->y = 0;
+    if (pi->y > sh - PET_H) pi->y = sh - PET_H;
+
     SetWindowPos(pi->hwnd, NULL, pi->x, pi->y, 0, 0,
         SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
 }
