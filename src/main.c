@@ -401,8 +401,8 @@ static void spawn_pet(void)
     render_scaled_frame_to(p, 0, 0, pi->dib_pixels, PET_W, PET_H);
     present_buffer(hwnd, pi->memdc);
 
-    /* keep focus on selector so user can rapid-fire Enter */
-    SetFocus(g_app.selector);
+    /* keep focus on listbox so arrow keys / Enter keep working */
+    SetFocus(g_app.listbox);
 }
 
 static void destroy_all_pets(void)
