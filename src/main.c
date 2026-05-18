@@ -410,8 +410,10 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         if (!pi) return 0;
         SetCapture(hwnd);
         pi->dragging = 1;
-        pi->drag_anchor_x = pi->x - (short)LOWORD(l);
-        pi->drag_anchor_y = pi->y - (short)HIWORD(l);
+        POINT pt;
+        GetCursorPos(&pt);
+        pi->drag_anchor_x = pt.x - pi->x;
+        pi->drag_anchor_y = pt.y - pi->y;
         pi->last_drag_x = pi->x;
         pi->last_drag_tick = GetTickCount();
         pi->drag_speed = 0.0f;
@@ -419,10 +421,10 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
     }
     case WM_MOUSEMOVE: {
         if (!pi || !pi->dragging) return 0;
-        int mx = (short)LOWORD(l);
-        int my = (short)HIWORD(l);
-        int new_x = pi->drag_anchor_x + mx;
-        int new_y = pi->drag_anchor_y + my;
+        POINT pt;
+        GetCursorPos(&pt);
+        int new_x = pt.x - pi->drag_anchor_x;
+        int new_y = pt.y - pi->drag_anchor_y;
 
         int dx = new_x - pi->last_drag_x;
         DWORD now = GetTickCount();
@@ -444,6 +446,23 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
         SetWindowPos(hwnd, NULL, new_x, new_y, 0, 0,
             SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+
+        /* real-time frame advance + render on every mouse move */
+        if (now >= pi->next_tick) {
+            pi->frame++;
+            if (pi->frame >= g_frame_counts[pi->state]) pi->frame = 0;
+            int base = g_frame_durations[pi->state][pi->frame];
+            float eff = pi->drag_speed;
+            if (now - pi->last_drag_tick > 50) eff = 0.0f;
+            float factor = 1.0f + eff * 3.0f;
+            int adj = (int)(base / factor);
+            if (adj < 15) adj = 15;
+            pi->next_tick = now + adj;
+        }
+        int sx = pi->frame * CELL_W;
+        int sy = pi->state * CELL_H;
+        render_frame_to_buffer(pi->pet, sx, sy, pi->dib_pixels);
+        present_buffer(hwnd, pi->memdc);
         return 0;
     }
     case WM_LBUTTONUP: {
