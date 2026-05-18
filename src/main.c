@@ -445,6 +445,9 @@ static void pet_trigger_anim(HWND hwnd, int target)
 
 static void ai_update_pos(PetInst *pi)
 {
+    /* Free movement is only allowed in running-left/right states */
+    if (pi->state != 1 && pi->state != 2) return;
+
     pi->ai_traj_t += pi->ai_traj_speed;
     if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
 
