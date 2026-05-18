@@ -96,6 +96,7 @@ typedef struct {
 
 static wchar_t g_base_dir[MAX_PATH];
 static App g_app = {0};
+static HWND g_focused_pet = NULL;
 
 /* ---------- json helpers ---------- */
 static const char *json_find_value(const char *json, const char *key)
@@ -361,6 +362,18 @@ static void update_preview(void)
 }
 
 /* ---------- pet instance management ---------- */
+static void pet_trigger_anim(HWND hwnd, int target)
+{
+    PetInst *pi = (PetInst *)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    if (!pi || !pi->alive || !pi->pet || !pi->pet->pixels) return;
+    pi->state = target;
+    pi->frame = 0;
+    pi->temp_anim = 1;
+    pi->next_tick = GetTickCount() + g_frame_durations[target][0];
+    render_scaled_frame_to(pi->pet, 0, target * CELL_H, pi->dib_pixels, PET_W, PET_H);
+    present_buffer(hwnd, pi->memdc);
+}
+
 static void spawn_pet(void)
 {
     if (g_app.selected < 0 || g_app.selected >= g_app.pet_count) return;
@@ -429,6 +442,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
     case WM_LBUTTONDOWN: {
         if (!pi) return 0;
         SetFocus(hwnd);
+        g_focused_pet = hwnd;
         SetCapture(hwnd);
         pi->dragging = 1;
         POINT pt;
@@ -500,26 +514,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         present_buffer(hwnd, pi->memdc);
         return 0;
     }
-    case WM_KEYDOWN: {
-        if (!pi) return 0;
-        int target = -1;
-        switch (w) {
-        case VK_SPACE: target = 4; break; /* jumping */
-        case 'W':      target = 3; break; /* waving  */
-        case 'E':      target = 5; break; /* failed  */
-        case 'Q':      target = 6; break; /* waiting */
-        case 'R':      target = 8; break; /* review  */
-        }
-        if (target >= 0) {
-            pi->state = target;
-            pi->frame = 0;
-            pi->temp_anim = 1;
-            pi->next_tick = GetTickCount() + g_frame_durations[target][0];
-            render_scaled_frame_to(pi->pet, 0, target * CELL_H, pi->dib_pixels, PET_W, PET_H);
-            present_buffer(hwnd, pi->memdc);
-        }
-        return 0;
-    }
+
     case WM_TIMER: {
         if (!pi || !pi->alive || !pi->pet || !pi->pet->pixels) return 0;
         DWORD now = GetTickCount();
@@ -559,6 +554,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             free_buffer(pi);
             g_app.instance_count--;
         }
+        if (g_focused_pet == hwnd) g_focused_pet = NULL;
         return 0;
     }
     return DefWindowProcW(hwnd, msg, w, l);
@@ -731,6 +727,18 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                 destroy_all_pets();
                 PostQuitMessage(0);
                 break;
+            }
+            int target = -1;
+            switch (msg.wParam) {
+            case VK_SPACE: target = 4; break; /* jumping */
+            case 'W':      target = 3; break; /* waving  */
+            case 'E':      target = 5; break; /* failed  */
+            case 'Q':      target = 6; break; /* waiting */
+            case 'R':      target = 8; break; /* review  */
+            }
+            if (target >= 0 && g_focused_pet) {
+                pet_trigger_anim(g_focused_pet, target);
+                continue;
             }
         }
         TranslateMessage(&msg);
