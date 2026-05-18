@@ -350,15 +350,11 @@ static void update_preview(void)
     if (now < g_app.preview_next) return;
 
     g_app.preview_frame++;
-    if (g_app.preview_frame >= g_frame_counts[g_app.preview_state]) {
-        g_app.preview_frame = 0;
-        g_app.preview_state++;
-        if (g_app.preview_state >= ROWS) g_app.preview_state = 0;
-    }
-    g_app.preview_next = now + g_frame_durations[g_app.preview_state][g_app.preview_frame];
+    if (g_app.preview_frame >= g_frame_counts[7]) g_app.preview_frame = 0;
+    g_app.preview_next = now + g_frame_durations[7][g_app.preview_frame];
 
     int sx = g_app.preview_frame * CELL_W;
-    int sy = g_app.preview_state * CELL_H;
+    int sy = 7 * CELL_H;
     render_scaled_frame_to(p, sx, sy, g_app.prev_pixels, PREV_W, PREV_H);
     present_buffer(g_app.preview, g_app.prev_memdc);
 }
@@ -545,9 +541,9 @@ static void on_sel_change(int idx)
     g_app.selected = idx;
     load_pet(&g_app.pets[idx]);
     SetWindowTextW(g_app.desc_label, g_app.pets[idx].desc);
-    g_app.preview_state = 0;
+    g_app.preview_state = 7;
     g_app.preview_frame = 0;
-    g_app.preview_next = GetTickCount() + g_frame_durations[0][0];
+    g_app.preview_next = GetTickCount() + g_frame_durations[7][0];
     /* clear preview buffer to avoid cross-pet ghosting */
     if (g_app.prev_pixels)
         memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
