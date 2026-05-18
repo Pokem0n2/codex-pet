@@ -99,6 +99,8 @@ typedef struct PetInst {
     /* directional run movement */
     int move_dx;
     int move_dy;
+    /* continuous running loop */
+    int run_loop_mode;
     /* AI state */
     int ai_active;
     DWORD ai_last_interaction;
@@ -414,6 +416,7 @@ static void pet_trigger_anim(HWND hwnd, int target)
     pi->state = target;
     pi->frame = 0;
     pi->temp_anim = 1;
+    pi->run_loop_mode = (target == 1 || target == 2) ? 1 : 0;
     if (target == 4) {
         if (pi->jump_active) {
             /* double jump boost */
@@ -576,6 +579,7 @@ static void ai_pick_action(PetInst *pi, DWORD now)
     pi->state = states[rand() % 8];
     pi->frame = 0;
     pi->temp_anim = (pi->state >= 3 || pi->state == 1 || pi->state == 2) ? 1 : 0;
+    pi->run_loop_mode = (pi->state == 1 || pi->state == 2) ? 1 : 0;
     pi->next_tick = now + g_frame_durations[pi->state][0];
 
     pi->ai_traj_type = rand() % 10;
@@ -676,6 +680,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->jump_vy = 0.0f;
         pi->move_dx = 0;
         pi->move_dy = 0;
+        pi->run_loop_mode = 0;
         pi->ai_active = 0;
         pi->ai_last_interaction = GetTickCount();
         pi->prev_x = pi->x;
@@ -689,6 +694,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         g_focused_pet = hwnd;
         SetCapture(hwnd);
         pi->dragging = 1;
+        pi->run_loop_mode = 0;
         pi->ai_active = 0;
         pi->ai_last_interaction = GetTickCount();
         POINT pt;
@@ -720,9 +726,9 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
         /* direction: only horizontal component matters */
         if (dx < 0) {
-            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
+            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; pi->run_loop_mode = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
         } else if (dx > 0) {
-            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
+            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; pi->run_loop_mode = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
         }
         pi->drag_speed = (float)(dx < 0 ? -dx : dx) / (float)dt;
 
@@ -754,6 +760,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->state = 0;
         pi->frame = 0;
         pi->temp_anim = 0;
+        pi->run_loop_mode = 0;
         pi->jump_active = 0;
         pi->jump_count = 0;
         pi->jump_vy = 0.0f;
@@ -789,7 +796,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         }
 
         /* temp running movement (horizontal or vertical) */
-        if (pi->temp_anim && (pi->state == 1 || pi->state == 2)) {
+        if (pi->temp_anim && (pi->state == 1 || pi->state == 2) && pi->run_loop_mode) {
             int moved = 0;
             if (pi->move_dx != 0) {
                 pi->x += pi->move_dx;
@@ -832,8 +839,15 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             if (pi->frame >= g_frame_counts[pi->state]) {
                 if (pi->temp_anim) {
                     if (pi->state == 1 || pi->state == 2) {
-                        /* loop running-left/right instead of returning to idle */
-                        pi->frame = 0;
+                        if (pi->run_loop_mode) {
+                            /* continuous loop: uniform timing, keep looping */
+                            pi->frame = 0;
+                        } else {
+                            /* graceful stop: finish cycle, then return to idle */
+                            pi->state = 0;
+                            pi->temp_anim = 0;
+                            pi->frame = 0;
+                        }
                     } else {
                         pi->state = 0;
                         pi->temp_anim = 0;
@@ -844,7 +858,12 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
                 }
             }
 
-            int base = g_frame_durations[pi->state][pi->frame];
+            int base;
+            if ((pi->state == 1 || pi->state == 2) && pi->run_loop_mode) {
+                base = 120; /* uniform speed during continuous running loop */
+            } else {
+                base = g_frame_durations[pi->state][pi->frame];
+            }
             int adj = base;
             if (pi->dragging) {
                 float eff = pi->drag_speed;
@@ -1046,12 +1065,10 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                  msg.wParam == VK_UP   || msg.wParam == VK_DOWN) && g_focused_pet) {
                 PetInst *pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
                 if (pi && pi->alive && pi->temp_anim && (pi->state == 1 || pi->state == 2)) {
-                    pi->state = 0;
-                    pi->temp_anim = 0;
-                    pi->frame = 0;
-                    pi->next_tick = GetTickCount() + g_frame_durations[0][0];
-                    render_scaled_frame_to(pi->pet, 0, 0, pi->dib_pixels, PET_W, PET_H);
-                    present_buffer(g_focused_pet, pi->memdc);
+                    /* graceful stop: let running animation finish with original durations */
+                    pi->run_loop_mode = 0;
+                    pi->move_dx = 0;
+                    pi->move_dy = 0;
                     continue;
                 }
             }
