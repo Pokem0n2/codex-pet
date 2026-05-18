@@ -432,6 +432,26 @@ static void spawn_pet(void)
     SetFocus(g_app.listbox);
 }
 
+static void force_set_focus(HWND hwnd)
+{
+    /* AttachThreadInput workaround: allows SetFocus to succeed even when
+       our thread is not the foreground thread (e.g. after clicking desktop). */
+    HWND fg = GetForegroundWindow();
+    if (fg) {
+        DWORD fgThread = GetWindowThreadProcessId(fg, NULL);
+        DWORD curThread = GetCurrentThreadId();
+        if (fgThread != curThread) {
+            AttachThreadInput(fgThread, curThread, TRUE);
+            SetFocus(hwnd);
+            AttachThreadInput(fgThread, curThread, FALSE);
+        } else {
+            SetFocus(hwnd);
+        }
+    } else {
+        SetFocus(hwnd);
+    }
+}
+
 static void destroy_all_pets(void)
 {
     for (int i = 0; i < MAX_INSTANCES; i++) {
@@ -460,7 +480,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
     }
     case WM_LBUTTONDOWN: {
         if (!pi) return 0;
-        SetFocus(hwnd);
+        force_set_focus(hwnd);
         g_focused_pet = hwnd;
         SetCapture(hwnd);
         pi->dragging = 1;
