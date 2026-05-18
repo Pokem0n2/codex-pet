@@ -549,32 +549,22 @@ static void ai_update_pos(PetInst *pi)
     float nx, ny;
     ai_trajectory_point(pi, t, &nx, &ny);
 
-    /* Numerical derivative for tangent direction */
+    /* Numerical derivative to estimate local arc length in screen space */
     float dt = 0.0001f;
     float nx2, ny2;
     ai_trajectory_point(pi, t + dt, &nx2, &ny2);
+    float dscreen = sqrtf(((nx2 - nx) * scale_x) * ((nx2 - nx) * scale_x) +
+                          ((ny2 - ny) * scale_y) * ((ny2 - ny) * scale_y));
+    if (dscreen < 0.001f) dscreen = 0.001f;
 
-    float dx = (nx2 - nx) * scale_x;
-    float dy = (ny2 - ny) * scale_y;
-    float len = sqrtf(dx * dx + dy * dy);
-    if (len < 0.001f) len = 0.001f;
-
-    /* Normalize and move exactly 2 pixels per tick */
-    dx = dx / len * 2.0f;
-    dy = dy / len * 2.0f;
-
-    pi->x += (int)(dx + 0.5f);
-    pi->y += (int)(dy + 0.5f);
-
-    /* Advance parameter t proportionally to arc length */
-    pi->ai_traj_t += dt * 2.0f / len;
+    /* Advance t so that the next point is ~2 pixels away along the curve */
+    pi->ai_traj_t += dt * 2.0f / dscreen;
     if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
 
-    /* Clamp to screen */
-    if (pi->x < 0) pi->x = 0;
-    if (pi->x > sw - PET_W) pi->x = sw - PET_W;
-    if (pi->y < 0) pi->y = 0;
-    if (pi->y > sh - PET_H) pi->y = sh - PET_H;
+    /* Place pet directly on the trajectory (absolute position) */
+    ai_trajectory_point(pi, pi->ai_traj_t, &nx, &ny);
+    pi->x = margin + (int)(nx * scale_x);
+    pi->y = margin + (int)(ny * scale_y);
 
     SetWindowPos(pi->hwnd, NULL, pi->x, pi->y, 0, 0,
         SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -589,7 +579,7 @@ static void ai_pick_action(PetInst *pi, DWORD now)
     pi->next_tick = now + g_frame_durations[pi->state][0];
 
     pi->ai_traj_type = rand() % 10;
-    pi->ai_traj_t = 0.0f;
+    pi->ai_traj_t = (float)rand() / (float)RAND_MAX;
     pi->ai_traj_speed = 0.001f + (rand() % 100) / 10000.0f;
     pi->ai_p1 = rand();
     pi->ai_p2 = rand();
