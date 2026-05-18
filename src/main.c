@@ -76,6 +76,7 @@ typedef struct PetInst {
     int state;
     int frame;
     int x, y;
+    int prev_x;
     DWORD next_tick;
     int alive;
     HDC memdc;
@@ -588,6 +589,7 @@ static void spawn_pet(void)
     pi->pet = p;
     pi->x = x;
     pi->y = y;
+    pi->prev_x = x;
     pi->alive = 1;
 
     HWND hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
@@ -653,6 +655,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->move_dy = 0;
         pi->ai_active = 0;
         pi->ai_last_interaction = GetTickCount();
+        pi->prev_x = pi->x;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         SetTimer(hwnd, IDT_PET, 16, NULL);
         return 0;
@@ -830,6 +833,16 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             pi->next_tick = now + adj;
             needs_render = 1;
         }
+
+        /* real-time running direction switch based on x delta */
+        if ((pi->state == 1 || pi->state == 2) && pi->prev_x != pi->x) {
+            if (pi->x > pi->prev_x && pi->state != 1) {
+                pi->state = 1; pi->frame = 0;
+            } else if (pi->x < pi->prev_x && pi->state != 2) {
+                pi->state = 2; pi->frame = 0;
+            }
+        }
+        pi->prev_x = pi->x;
 
         if (needs_render) {
             int sx = pi->frame * CELL_W;
