@@ -594,9 +594,14 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             pi->frame++;
             if (pi->frame >= g_frame_counts[pi->state]) {
                 if (pi->temp_anim) {
-                    pi->state = 0;
-                    pi->temp_anim = 0;
-                    pi->frame = 0;
+                    if (pi->state == 1 || pi->state == 2) {
+                        /* loop running-left/right instead of returning to idle */
+                        pi->frame = 0;
+                    } else {
+                        pi->state = 0;
+                        pi->temp_anim = 0;
+                        pi->frame = 0;
+                    }
                 } else {
                     pi->frame = 0;
                 }
@@ -784,6 +789,20 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
 
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
+        if (msg.message == WM_KEYUP) {
+            if ((msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT) && g_focused_pet) {
+                PetInst *pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
+                if (pi && pi->alive && pi->temp_anim && (pi->state == 1 || pi->state == 2)) {
+                    pi->state = 0;
+                    pi->temp_anim = 0;
+                    pi->frame = 0;
+                    pi->next_tick = GetTickCount() + g_frame_durations[0][0];
+                    render_scaled_frame_to(pi->pet, 0, 0, pi->dib_pixels, PET_W, PET_H);
+                    present_buffer(g_focused_pet, pi->memdc);
+                    continue;
+                }
+            }
+        }
         if (msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN) {
             if (msg.wParam == VK_RETURN) {
                 spawn_pet();
