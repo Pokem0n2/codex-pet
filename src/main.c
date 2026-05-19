@@ -127,8 +127,10 @@ typedef struct {
     int selected;
     HWND selector;
     HWND preview;
-    HWND listbox;
+    HWND combobox;
     HWND desc_label;
+    HFONT ui_font;
+    HFONT desc_font;
     PetInst instances[MAX_INSTANCES];
     int instance_count;
     int preview_state;
@@ -355,9 +357,12 @@ static void render_frame_to_buffer(Pet *pet, int fx, int fy, BYTE *dst)
     int dst_stride = CELL_W * 4;
     for (int y = 0; y < CELL_H; y++) {
         int sy = fy + y;
-        if (sy >= pet->h) break;
-        BYTE *src = pet->pixels + sy * src_stride + fx * 4;
-        memcpy(dst + y * dst_stride, src, dst_stride);
+        if (sy < 0 || sy >= pet->h || fx < 0 || fx + CELL_W > pet->w) {
+            memset(dst + y * dst_stride, 0, dst_stride);
+        } else {
+            BYTE *src = pet->pixels + sy * src_stride + fx * 4;
+            memcpy(dst + y * dst_stride, src, dst_stride);
+        }
     }
 }
 
@@ -405,6 +410,7 @@ static void update_preview(void)
 
     int sx = g_app.preview_frame * CELL_W;
     int sy = 7 * CELL_H;
+    memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
     render_scaled_frame_to(p, sx, sy, g_app.prev_pixels, PREV_W, PREV_H);
 }
 
@@ -820,8 +826,8 @@ static void spawn_pet(void)
     render_scaled_frame_to(p, 0, 0, pi->dib_pixels, PET_W, PET_H);
     present_buffer(hwnd, pi->memdc);
 
-    /* keep focus on listbox so arrow keys / Enter keep working */
-    SetFocus(g_app.listbox);
+    /* keep focus on combobox so arrow keys / Enter keep working */
+    SetFocus(g_app.combobox);
 }
 
 static void force_set_focus(HWND hwnd)
@@ -1145,12 +1151,60 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
 /* preview is drawn inside selector via AlphaBlend in WM_PAINT */
 
+static void draw_text_with_spacing(HDC hdc, RECT *rc, const wchar_t *text, int spacing)
+{
+    int y = rc->top;
+    int max_width = rc->right - rc->left;
+    const wchar_t *p = text;
+    TEXTMETRICW tm;
+    GetTextMetricsW(hdc, &tm);
+    int line_height = tm.tmHeight + spacing;
+
+    FillRect(hdc, rc, (HBRUSH)(COLOR_BTNFACE + 1));
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
+
+    while (*p && y + tm.tmHeight <= rc->bottom) {
+        int len = (int)wcslen(p);
+        int fit = 0;
+        SIZE sz;
+
+        GetTextExtentExPointW(hdc, p, len, max_width, &fit, NULL, &sz);
+
+        if (fit == 0 && len > 0) {
+            fit = 1;
+        }
+
+        if (fit < len) {
+            int nl_pos = -1;
+            for (int j = 0; j < fit; j++) {
+                if (p[j] == L'\n') { nl_pos = j; break; }
+            }
+            if (nl_pos >= 0) {
+                fit = nl_pos;
+            } else {
+                int i = fit;
+                while (i > 0 && p[i] != L' ' && p[i] != L'\n') i--;
+                if (i > 0) fit = i;
+            }
+        }
+
+        TextOutW(hdc, rc->left, y, p, fit);
+
+        y += line_height;
+
+        p += fit;
+        while (*p == L' ' || *p == L'\n' || *p == L'\r') p++;
+    }
+}
+
 static void on_sel_change(int idx)
 {
     if (idx < 0 || idx >= g_app.pet_count) return;
     g_app.selected = idx;
     load_pet(&g_app.pets[idx]);
     SetWindowTextW(g_app.desc_label, g_app.pets[idx].desc);
+    InvalidateRect(g_app.desc_label, NULL, TRUE);
     g_app.preview_state = 7;
     g_app.preview_frame = 0;
     g_app.preview_next = GetTickCount() + 120;
@@ -1158,12 +1212,13 @@ static void on_sel_change(int idx)
     if (g_app.prev_pixels) {
         Pet *p = &g_app.pets[idx];
         if (p && p->pixels) {
+            memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
             render_scaled_frame_to(p, 0, 7 * CELL_H, g_app.prev_pixels, PREV_W, PREV_H);
         }
     }
     /* force redraw */
     if (g_app.selector) {
-        RECT rc = {190, 10, 190 + PREV_W, 10 + PREV_H};
+        RECT rc = {15, 15, 15 + PREV_W, 15 + PREV_H};
         InvalidateRect(g_app.selector, &rc, TRUE);
     }
 }
@@ -1172,40 +1227,63 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 {
     switch (msg) {
     case WM_CREATE: {
-        g_app.listbox = CreateWindowExW(0, L"LISTBOX", NULL,
-            WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
-            10, 10, 160, 380, hwnd, (HMENU)IDC_LISTBOX, g_app.hinst, NULL);
+        g_app.ui_font = CreateFontW(-12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, NULL);
+
+        g_app.combobox = CreateWindowExW(0, L"COMBOBOX", NULL,
+            WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
+            130, 15, 150, 200, hwnd, (HMENU)IDC_LISTBOX, g_app.hinst, NULL);
         for (int i = 0; i < g_app.pet_count; i++)
-            SendMessageW(g_app.listbox, LB_ADDSTRING, 0, (LPARAM)g_app.pets[i].id);
+            SendMessageW(g_app.combobox, CB_ADDSTRING, 0, (LPARAM)g_app.pets[i].name);
+        SendMessageW(g_app.combobox, WM_SETFONT, (WPARAM)g_app.ui_font, TRUE);
 
+        g_app.desc_font = CreateFontW(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, NULL);
         g_app.desc_label = CreateWindowExW(0, L"STATIC", L"Select a pet",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            190, 230, 380, 160, hwnd, NULL, g_app.hinst, NULL);
+            WS_CHILD | WS_VISIBLE | SS_OWNERDRAW,
+            130, 40, 150, 60, hwnd, NULL, g_app.hinst, NULL);
+        SendMessageW(g_app.desc_label, WM_SETFONT, (WPARAM)g_app.desc_font, TRUE);
 
-        CreateWindowExW(0, L"STATIC", L"ENTER: spawn pet   ESC: exit",
+        HWND hint = CreateWindowExW(0, L"STATIC", L"ENTER: spawn    ESC: exit",
             WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, 400, 560, 20, hwnd, NULL, g_app.hinst, NULL);
+            130, 100, 150, 20, hwnd, NULL, g_app.hinst, NULL);
+        SendMessageW(hint, WM_SETFONT, (WPARAM)g_app.ui_font, TRUE);
 
         if (g_app.pet_count > 0) {
-            SendMessageW(g_app.listbox, LB_SETCURSEL, 0, 0);
+            SendMessageW(g_app.combobox, CB_SETCURSEL, 0, 0);
             on_sel_change(0);
             /* force first preview draw */
             {
-                RECT rc = {190, 10, 190 + PREV_W, 10 + PREV_H};
+                RECT rc = {15, 15, 15 + PREV_W, 15 + PREV_H};
                 InvalidateRect(hwnd, &rc, TRUE);
             }
         }
-        SetFocus(g_app.listbox);
+        SetFocus(g_app.combobox);
         return 0;
     }
     case WM_COMMAND:
-        if (LOWORD(w) == IDC_LISTBOX && HIWORD(w) == LBN_SELCHANGE)
-            on_sel_change((int)SendMessageW(g_app.listbox, LB_GETCURSEL, 0, 0));
+        if (LOWORD(w) == IDC_LISTBOX && HIWORD(w) == CBN_SELCHANGE)
+            on_sel_change((int)SendMessageW(g_app.combobox, CB_GETCURSEL, 0, 0));
         return 0;
+    case WM_DRAWITEM: {
+        DRAWITEMSTRUCT *dis = (DRAWITEMSTRUCT *)l;
+        if (dis->hwndItem == g_app.desc_label) {
+            HFONT hFont = (HFONT)SendMessageW(dis->hwndItem, WM_GETFONT, 0, 0);
+            HFONT oldFont = (HFONT)SelectObject(dis->hDC, hFont);
+            wchar_t text[256];
+            GetWindowTextW(dis->hwndItem, text, 256);
+            draw_text_with_spacing(dis->hDC, &dis->rcItem, text, 3);
+            SelectObject(dis->hDC, oldFont);
+            return TRUE;
+        }
+        break;
+    }
     case WM_TIMER:
         update_preview();
         {
-            RECT rc = {190, 10, 190 + PREV_W, 10 + PREV_H};
+            RECT rc = {15, 15, 15 + PREV_W, 15 + PREV_H};
             InvalidateRect(hwnd, &rc, FALSE);
         }
         return 0;
@@ -1216,11 +1294,11 @@ static LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
         /* 先清空预览区背景，防止旧帧残留 */
-        RECT rc_preview = {190, 10, 190 + PREV_W, 10 + PREV_H};
+        RECT rc_preview = {15, 15, 15 + PREV_W, 15 + PREV_H};
         FillRect(hdc, &rc_preview, (HBRUSH)(COLOR_BTNFACE + 1));
         if (g_app.selected >= 0 && g_app.selected < g_app.pet_count && g_app.prev_memdc) {
             BLENDFUNCTION bf = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
-            AlphaBlend(hdc, 190, 10, PREV_W, PREV_H, g_app.prev_memdc, 0, 0, PREV_W, PREV_H, bf);
+            AlphaBlend(hdc, 15, 15, PREV_W, PREV_H, g_app.prev_memdc, 0, 0, PREV_W, PREV_H, bf);
         }
         EndPaint(hwnd, &ps);
         return 0;
@@ -1286,9 +1364,11 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
     wc_pet.lpszClassName = L"PetWindow";
     RegisterClassW(&wc_pet);
 
-    g_app.selector = CreateWindowExW(0, L"PetSelector", L"Codex Pet",
+    RECT rc = {0, 0, 300, 136};
+    AdjustWindowRect(&rc, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
+    g_app.selector = CreateWindowExW(0, L"PetSelector", L"CodeX-Pet-3.0",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 620, 520, NULL, NULL, hinst, NULL);
+        CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hinst, NULL);
 
     ShowWindow(g_app.selector, SW_SHOW);
     UpdateWindow(g_app.selector);
@@ -1411,6 +1491,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
     for (int i = 0; i < g_app.pet_count; i++) free_pet(&g_app.pets[i]);
     if (g_app.prev_memdc) { DeleteDC(g_app.prev_memdc); g_app.prev_memdc = NULL; }
     if (g_app.prev_dib) { DeleteObject(g_app.prev_dib); g_app.prev_dib = NULL; }
+    if (g_app.ui_font) { DeleteObject(g_app.ui_font); g_app.ui_font = NULL; }
+    if (g_app.desc_font) { DeleteObject(g_app.desc_font); g_app.desc_font = NULL; }
     IWICImagingFactory_Release(g_app.wic);
     CoUninitialize();
     return 0;
