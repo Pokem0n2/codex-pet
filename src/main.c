@@ -101,6 +101,8 @@ typedef struct PetInst {
     int move_dy;
     /* continuous running loop */
     int run_loop_mode;
+    /* auto-run direction for a full running cycle (1=right, -1=left, 0=none) */
+    int run_dir_x;
     /* AI state */
     int ai_active;
     DWORD ai_last_interaction;
@@ -417,6 +419,11 @@ static void pet_trigger_anim(HWND hwnd, int target)
     pi->frame = 0;
     pi->temp_anim = 1;
     pi->run_loop_mode = (target == 1 || target == 2) ? 1 : 0;
+    if (target == 1 || target == 2) {
+        pi->run_dir_x = (target == 1) ? 1 : -1;
+    } else {
+        pi->run_dir_x = 0;
+    }
     if (target == 4) {
         if (pi->jump_active) {
             /* double jump boost */
@@ -580,6 +587,7 @@ static void ai_pick_action(PetInst *pi, DWORD now)
     pi->frame = 0;
     pi->temp_anim = (pi->state >= 3 || pi->state == 1 || pi->state == 2) ? 1 : 0;
     pi->run_loop_mode = (pi->state == 1 || pi->state == 2) ? 1 : 0;
+    pi->run_dir_x = (pi->state == 1) ? 1 : (pi->state == 2) ? -1 : 0;
     pi->next_tick = now + g_frame_durations[pi->state][0];
 
     pi->ai_traj_type = rand() % 10;
@@ -681,6 +689,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->move_dx = 0;
         pi->move_dy = 0;
         pi->run_loop_mode = 0;
+        pi->run_dir_x = 0;
         pi->ai_active = 0;
         pi->ai_last_interaction = GetTickCount();
         pi->prev_x = pi->x;
@@ -726,9 +735,9 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
         /* direction: only horizontal component matters */
         if (dx < 0) {
-            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; pi->run_loop_mode = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
+            if (pi->state != 2) { pi->state = 2; pi->frame = 0; pi->temp_anim = 0; pi->run_loop_mode = 0; pi->run_dir_x = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
         } else if (dx > 0) {
-            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; pi->run_loop_mode = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
+            if (pi->state != 1) { pi->state = 1; pi->frame = 0; pi->temp_anim = 0; pi->run_loop_mode = 0; pi->run_dir_x = 0; pi->jump_active = 0; pi->jump_count = 0; pi->jump_vy = 0.0f; pi->move_dx = 0; pi->move_dy = 0; }
         }
         pi->drag_speed = (float)(dx < 0 ? -dx : dx) / (float)dt;
 
@@ -761,6 +770,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->frame = 0;
         pi->temp_anim = 0;
         pi->run_loop_mode = 0;
+        pi->run_dir_x = 0;
         pi->jump_active = 0;
         pi->jump_count = 0;
         pi->jump_vy = 0.0f;
@@ -796,17 +806,23 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         }
 
         /* temp running movement (horizontal or vertical) */
-        if (pi->temp_anim && (pi->state == 1 || pi->state == 2) && pi->run_loop_mode) {
+        if (pi->temp_anim && (pi->state == 1 || pi->state == 2)) {
             int moved = 0;
-            if (pi->move_dx != 0) {
-                pi->x += pi->move_dx;
+            int dx = pi->move_dx;
+            int dy = pi->move_dy;
+            /* auto-run for a full cycle even after key release */
+            if (dx == 0 && dy == 0 && pi->run_dir_x != 0) {
+                dx = pi->run_dir_x * 2;
+            }
+            if (dx != 0) {
+                pi->x += dx;
                 int sw = GetSystemMetrics(SM_CXSCREEN);
                 if (pi->x < 0) pi->x = 0;
                 if (pi->x > sw - PET_W) pi->x = sw - PET_W;
                 moved = 1;
             }
-            if (pi->move_dy != 0) {
-                pi->y += pi->move_dy;
+            if (dy != 0) {
+                pi->y += dy;
                 int sh = GetSystemMetrics(SM_CYSCREEN);
                 if (pi->y < 0) pi->y = 0;
                 if (pi->y > sh - PET_H) pi->y = sh - PET_H;
@@ -847,11 +863,17 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
                             pi->state = 0;
                             pi->temp_anim = 0;
                             pi->frame = 0;
+                            pi->run_dir_x = 0;
+                            pi->move_dx = 0;
+                            pi->move_dy = 0;
                         }
                     } else {
                         pi->state = 0;
                         pi->temp_anim = 0;
                         pi->frame = 0;
+                        pi->run_dir_x = 0;
+                        pi->move_dx = 0;
+                        pi->move_dy = 0;
                     }
                 } else {
                     pi->frame = 0;
