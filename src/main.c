@@ -99,6 +99,8 @@ typedef struct PetInst {
     /* directional run movement */
     int move_dx;
     int move_dy;
+    float move_subx;
+    float move_suby;
     /* continuous running loop */
     int run_loop_mode;
     /* auto-run direction for a full running cycle (1=right, -1=left, 0=none) */
@@ -572,59 +574,45 @@ static void ai_update_pos(PetInst *pi)
     float nx, ny;
     ai_trajectory_point(pi, t, &nx, &ny);
 
-    /* Numerical derivative to estimate local arc length in screen space */
+    /* Compute local tangent direction in screen space */
     float dt = 0.0001f;
     float nx2, ny2;
     ai_trajectory_point(pi, t + dt, &nx2, &ny2);
-    float dscreen = sqrtf(((nx2 - nx) * scale_x) * ((nx2 - nx) * scale_x) +
-                          ((ny2 - ny) * scale_y) * ((ny2 - ny) * scale_y));
-    if (dscreen < 0.001f) dscreen = 0.001f;
+    float dir_x = (nx2 - nx) * scale_x;
+    float dir_y = (ny2 - ny) * scale_y;
+    float dir_len = sqrtf(dir_x * dir_x + dir_y * dir_y);
+    if (dir_len < 0.001f) dir_len = 0.001f;
 
-    /* Advance t so that the next point is ~1 pixel away along the curve */
-    pi->ai_traj_t += dt * 1.0f / dscreen;
+    /* Advance t proportionally so arc-length speed is ~1 px/tick */
+    pi->ai_traj_t += dt * 1.0f / dir_len;
     if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
 
-    /* Compute target position from trajectory */
-    ai_trajectory_point(pi, pi->ai_traj_t, &nx, &ny);
-    int target_x = margin + (int)(nx * scale_x);
-    int target_y = margin + (int)(ny * scale_y);
+    /* Move exactly 1 pixel along the trajectory tangent.
+       Sub-pixel accumulators ensure smooth motion at any angle. */
+    pi->ai_subx += dir_x / dir_len;
+    pi->ai_suby += dir_y / dir_len;
 
-    /* Boundary clamp on target */
-    if (target_x < 0) target_x = 0;
-    if (target_x > sw - PET_W) target_x = sw - PET_W;
-    if (target_y < 0) target_y = 0;
-    if (target_y > sh - PET_H) target_y = sh - PET_H;
-
-    /* Limit actual movement per tick to prevent teleportation,
-       while preserving sub-pixel fractions for smooth diagonal motion. */
-    int old_x = pi->x;
-    int old_y = pi->y;
-    int dx = target_x - old_x;
-    int dy = target_y - old_y;
-    float dist = sqrtf((float)(dx * dx) + (float)(dy * dy));
-    float move_x, move_y;
-    if (dist > 1.0f) {
-        float ratio = 1.0f / dist;
-        move_x = dx * ratio;
-        move_y = dy * ratio;
-    } else {
-        move_x = (float)dx;
-        move_y = (float)dy;
-    }
-    pi->ai_subx += move_x;
-    pi->ai_suby += move_y;
     int ix = (int)pi->ai_subx;
     int iy = (int)pi->ai_suby;
     pi->ai_subx -= (float)ix;
     pi->ai_suby -= (float)iy;
+
     pi->x += ix;
     pi->y += iy;
 
-    /* Final boundary clamp */
+    /* Boundary clamp */
     if (pi->x < 0) pi->x = 0;
     if (pi->x > sw - PET_W) pi->x = sw - PET_W;
     if (pi->y < 0) pi->y = 0;
     if (pi->y > sh - PET_H) pi->y = sh - PET_H;
+
+    /* If the boundary blocked movement, clear sub-pixel accumulators
+       so the pet doesn't jitter from repeated outward pushes. */
+    if ((pi->x == 0 && ix < 0) || (pi->x == sw - PET_W && ix > 0) ||
+        (pi->y == 0 && iy < 0) || (pi->y == sh - PET_H && iy > 0)) {
+        pi->ai_subx = 0.0f;
+        pi->ai_suby = 0.0f;
+    }
 
     SetWindowPos(pi->hwnd, NULL, pi->x, pi->y, 0, 0,
         SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -877,6 +865,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->jump_vy = 0.0f;
         pi->move_dx = 0;
         pi->move_dy = 0;
+        pi->move_subx = 0.0f;
+        pi->move_suby = 0.0f;
         pi->run_loop_mode = 0;
         pi->run_dir_x = 0;
         pi->ai_active = 0;
@@ -971,6 +961,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->jump_vy = 0.0f;
         pi->move_dx = 0;
         pi->move_dy = 0;
+        pi->move_subx = 0.0f;
+        pi->move_suby = 0.0f;
         pi->drag_speed = 0.0f;
         pi->ai_subx = 0.0f;
         pi->ai_suby = 0.0f;
@@ -1010,6 +1002,20 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             /* auto-run for a full cycle even after key release */
             if (dx == 0 && dy == 0 && pi->run_dir_x != 0) {
                 dx = pi->run_dir_x * 1;
+            }
+            /* Enforce uniform 1 px/tick speed even on diagonals */
+            if (dx != 0 && dy != 0) {
+                float len = sqrtf((float)(dx * dx) + (float)(dy * dy));
+                float ratio = 1.0f / len;
+                pi->move_subx += dx * ratio;
+                pi->move_suby += dy * ratio;
+                dx = (int)pi->move_subx;
+                dy = (int)pi->move_suby;
+                pi->move_subx -= dx;
+                pi->move_suby -= dy;
+            } else {
+                pi->move_subx = 0.0f;
+                pi->move_suby = 0.0f;
             }
             if (dx != 0) {
                 pi->x += dx;
@@ -1362,6 +1368,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                     pi->ai_next_state = -1;
                     pi->ai_subx = 0.0f;
                     pi->ai_suby = 0.0f;
+                    pi->move_subx = 0.0f;
+                    pi->move_suby = 0.0f;
                     pi->ai_last_interaction = GetTickCount();
                 }
                 /* During jumping, block all state-switching keys except left/right arrows and space (double-jump) */
