@@ -111,6 +111,8 @@ typedef struct PetInst {
     int ai_traj_type;
     float ai_traj_t;
     float ai_traj_speed;
+    float ai_subx;
+    float ai_suby;
     int ai_p1;
     int ai_p2;
 } PetInst;
@@ -592,20 +594,30 @@ static void ai_update_pos(PetInst *pi)
     if (target_y < 0) target_y = 0;
     if (target_y > sh - PET_H) target_y = sh - PET_H;
 
-    /* Limit actual movement per tick to prevent teleportation */
+    /* Limit actual movement per tick to prevent teleportation,
+       while preserving sub-pixel fractions for smooth diagonal motion. */
     int old_x = pi->x;
     int old_y = pi->y;
     int dx = target_x - old_x;
     int dy = target_y - old_y;
     float dist = sqrtf((float)(dx * dx) + (float)(dy * dy));
+    float move_x, move_y;
     if (dist > 1.0f) {
         float ratio = 1.0f / dist;
-        pi->x = old_x + (int)(dx * ratio);
-        pi->y = old_y + (int)(dy * ratio);
+        move_x = dx * ratio;
+        move_y = dy * ratio;
     } else {
-        pi->x = target_x;
-        pi->y = target_y;
+        move_x = (float)dx;
+        move_y = (float)dy;
     }
+    pi->ai_subx += move_x;
+    pi->ai_suby += move_y;
+    int ix = (int)pi->ai_subx;
+    int iy = (int)pi->ai_suby;
+    pi->ai_subx -= (float)ix;
+    pi->ai_suby -= (float)iy;
+    pi->x += ix;
+    pi->y += iy;
 
     /* Final boundary clamp */
     if (pi->x < 0) pi->x = 0;
@@ -732,6 +744,10 @@ static void ai_apply_state(PetInst *pi, int state, DWORD now)
         pi->jump_origin_y = pi->y;
         pi->jump_vy = -10.1f;
     }
+
+    /* Reset sub-pixel accumulators on state change to prevent drift */
+    pi->ai_subx = 0.0f;
+    pi->ai_suby = 0.0f;
 
     render_scaled_frame_to(pi->pet, 0, state * CELL_H, pi->dib_pixels, PET_W, PET_H);
     present_buffer(pi->hwnd, pi->memdc);
@@ -864,6 +880,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->run_dir_x = 0;
         pi->ai_active = 0;
         pi->ai_next_state = -1;
+        pi->ai_subx = 0.0f;
+        pi->ai_suby = 0.0f;
         pi->ai_last_interaction = GetTickCount();
         pi->prev_x = pi->x;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
@@ -879,6 +897,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->run_loop_mode = 0;
         pi->ai_active = 0;
         pi->ai_next_state = -1;
+        pi->ai_subx = 0.0f;
+        pi->ai_suby = 0.0f;
         pi->ai_last_interaction = GetTickCount();
         POINT pt;
         GetCursorPos(&pt);
@@ -951,6 +971,8 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->move_dx = 0;
         pi->move_dy = 0;
         pi->drag_speed = 0.0f;
+        pi->ai_subx = 0.0f;
+        pi->ai_suby = 0.0f;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         /* render idle frame immediately */
         render_scaled_frame_to(pi->pet, 0, 0, pi->dib_pixels, PET_W, PET_H);
@@ -1337,6 +1359,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                 if (pi) {
                     pi->ai_active = 0;
                     pi->ai_next_state = -1;
+                    pi->ai_subx = 0.0f;
+                    pi->ai_suby = 0.0f;
                     pi->ai_last_interaction = GetTickCount();
                 }
                 /* During jumping, block all state-switching keys except left/right arrows and space (double-jump) */
