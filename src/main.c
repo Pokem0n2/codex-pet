@@ -393,11 +393,12 @@ static void update_preview(void)
 
     g_app.preview_frame++;
     if (g_app.preview_frame >= g_frame_counts[7]) g_app.preview_frame = 0;
-    g_app.preview_next = now + 100;
+    int base = g_frame_durations[7][g_app.preview_frame];
+    if (base <= 0) base = 100;
+    g_app.preview_next = now + base;
 
     int sx = g_app.preview_frame * CELL_W;
     int sy = 7 * CELL_H;
-    memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
     render_scaled_frame_to(p, sx, sy, g_app.prev_pixels, PREV_W, PREV_H);
 }
 
@@ -946,10 +947,9 @@ static void on_sel_change(int idx)
     SetWindowTextW(g_app.desc_label, g_app.pets[idx].desc);
     g_app.preview_state = 7;
     g_app.preview_frame = 0;
-    g_app.preview_next = GetTickCount() + 100;
+    g_app.preview_next = GetTickCount() + g_frame_durations[7][0];
     /* render first frame immediately to avoid blank period */
     if (g_app.prev_pixels) {
-        memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
         Pet *p = &g_app.pets[idx];
         if (p && p->pixels) {
             render_scaled_frame_to(p, 0, 7 * CELL_H, g_app.prev_pixels, PREV_W, PREV_H);
