@@ -107,6 +107,7 @@ typedef struct PetInst {
     int ai_active;
     DWORD ai_last_interaction;
     DWORD ai_next_action;
+    int ai_next_state;      /* pending transition target, -1 = none */
     int ai_traj_type;
     float ai_traj_t;
     float ai_traj_speed;
@@ -616,25 +617,160 @@ static void ai_update_pos(PetInst *pi)
         SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
+/* Weighted state transition based on current state and pet personality.
+   activity: 0=lazy, 1=normal, 2=hyper  |  run_bias: 0=left-biased, 1=balanced, 2=right-biased */
+static int ai_weighted_state(PetInst *pi)
+{
+    int activity = (pi->ai_p1 % 3);      /* 0,1,2 */
+    int run_bias = (pi->ai_p2 % 3);      /* 0,1,2 */
+    int r = rand() % 100;
+
+    switch (pi->state) {
+    case 0: /* idle */
+        if (r < 30 - activity * 5) return 0;
+        if (r < 50 + activity * 5) return (run_bias == 0) ? 2 : 1;
+        if (r < 70 + activity * 5) return (run_bias == 0) ? 1 : 2;
+        if (r < 82) return 3;
+        if (r < 88) return 6;
+        if (r < 93) return 4;
+        if (r < 97) return 8;
+        return 5;
+    case 1: /* running-right */
+        if (r < 20) return 0;
+        if (r < 50 + activity * 5) return 1;
+        if (r < 65 + activity * 5) return 2;
+        if (r < 80) return 8;
+        if (r < 88) return 4;
+        if (r < 93) return 3;
+        if (r < 97) return 6;
+        return 5;
+    case 2: /* running-left */
+        if (r < 20) return 0;
+        if (r < 50 + activity * 5) return 2;
+        if (r < 65 + activity * 5) return 1;
+        if (r < 80) return 8;
+        if (r < 88) return 4;
+        if (r < 93) return 3;
+        if (r < 97) return 6;
+        return 5;
+    case 3: /* waving */
+        if (r < 55) return 0;
+        if (r < 70) return 1;
+        if (r < 85) return 2;
+        if (r < 90) return 8;
+        if (r < 94) return 6;
+        if (r < 97) return 4;
+        return 5;
+    case 4: /* jumping */
+        if (r < 45) return 0;
+        if (r < 65) return 1;
+        if (r < 85) return 2;
+        if (r < 90) return 8;
+        if (r < 95) return 3;
+        if (r < 98) return 6;
+        return 5;
+    case 5: /* failed */
+        if (r < 75) return 0;
+        if (r < 88) return 1;
+        if (r < 98) return 2;
+        return 8;
+    case 6: /* waiting */
+        if (r < 45) return 0;
+        if (r < 62) return 1;
+        if (r < 79) return 2;
+        if (r < 88) return 3;
+        if (r < 94) return 8;
+        if (r < 97) return 4;
+        return 5;
+    case 8: /* review */
+        if (r < 35) return 0;
+        if (r < 55) return 1;
+        if (r < 75) return 2;
+        if (r < 85) return 3;
+        if (r < 92) return 8;
+        if (r < 97) return 6;
+        return 4;
+    }
+    return 0;
+}
+
+static int ai_state_duration(int state, int activity)
+{
+    int base_min, base_max;
+    switch (state) {
+    case 0:  base_min = 3000; base_max = 7000; break; /* idle   */
+    case 1:
+    case 2:  base_min = 4000; base_max = 9000; break; /* running */
+    case 3:  base_min = 2000; base_max = 4000; break; /* waving  */
+    case 4:  base_min = 1500; base_max = 3000; break; /* jumping */
+    case 5:  base_min = 2000; base_max = 4000; break; /* failed  */
+    case 6:  base_min = 2000; base_max = 5000; break; /* waiting */
+    case 8:  base_min = 2000; base_max = 4000; break; /* review  */
+    default: base_min = 2000; base_max = 5000; break;
+    }
+    /* Hyper pets act faster/shorter; lazy pets linger longer */
+    int adj = (activity - 1) * 800;
+    base_min -= adj;
+    base_max -= adj;
+    if (base_min < 800)  base_min = 800;
+    if (base_max < base_min + 500) base_max = base_min + 500;
+    return base_min + rand() % (base_max - base_min);
+}
+
+static void ai_apply_state(PetInst *pi, int state, DWORD now)
+{
+    pi->state = state;
+    pi->frame = 0;
+    pi->temp_anim = (state >= 3 || state == 1 || state == 2) ? 1 : 0;
+    pi->run_loop_mode = (state == 1 || state == 2) ? 1 : 0;
+    pi->run_dir_x = (state == 1) ? 1 : (state == 2) ? -1 : 0;
+    pi->next_tick = now + g_frame_durations[state][0];
+
+    if (state == 4) {
+        pi->jump_active = 1;
+        pi->jump_count = 1;
+        pi->jump_origin_y = pi->y;
+        pi->jump_vy = -10.1f;
+    }
+
+    render_scaled_frame_to(pi->pet, 0, state * CELL_H, pi->dib_pixels, PET_W, PET_H);
+    present_buffer(pi->hwnd, pi->memdc);
+}
+
 static void ai_pick_action(PetInst *pi, DWORD now)
 {
-    int states[] = {0, 1, 2, 3, 4, 5, 6, 8};
-    pi->state = states[rand() % 8];
-    pi->frame = 0;
-    pi->temp_anim = (pi->state >= 3 || pi->state == 1 || pi->state == 2) ? 1 : 0;
-    pi->run_loop_mode = (pi->state == 1 || pi->state == 2) ? 1 : 0;
-    pi->run_dir_x = (pi->state == 1) ? 1 : (pi->state == 2) ? -1 : 0;
-    pi->next_tick = now + g_frame_durations[pi->state][0];
+    int next = ai_weighted_state(pi);
+    int activity = (pi->ai_p1 % 3);
 
-    pi->ai_traj_type = rand() % 10;
-    pi->ai_traj_t = (float)rand() / (float)RAND_MAX;
-    pi->ai_traj_speed = 0.001f + (rand() % 100) / 10000.0f;
-    pi->ai_p1 = rand();
-    pi->ai_p2 = rand();
-    pi->ai_next_action = now + AI_MIN_ACTION + rand() % (AI_MAX_ACTION - AI_MIN_ACTION);
+    /* Trajectory: 80% keep current, 20% switch */
+    if ((rand() % 100) < 20) {
+        pi->ai_traj_type = rand() % 10;
+        pi->ai_traj_t = (float)rand() / (float)RAND_MAX;
+    }
+    /* If switching from non-running to running, seed t from current position
+       to minimise position jump (approximate by using x coordinate ratio) */
+    if ((pi->state != 1 && pi->state != 2) && (next == 1 || next == 2)) {
+        int sw = GetSystemMetrics(SM_CXSCREEN);
+        int margin = 20;
+        float scale_x = (float)(sw - PET_W - 2 * margin);
+        if (scale_x > 0.0f) {
+            pi->ai_traj_t = (float)(pi->x - margin) / scale_x;
+            if (pi->ai_traj_t < 0.0f) pi->ai_traj_t = 0.0f;
+            if (pi->ai_traj_t > 1.0f) pi->ai_traj_t = 1.0f;
+        }
+    }
 
-    render_scaled_frame_to(pi->pet, 0, pi->state * CELL_H, pi->dib_pixels, PET_W, PET_H);
-    present_buffer(pi->hwnd, pi->memdc);
+    pi->ai_next_action = now + ai_state_duration(next, activity);
+
+    /* If currently running, enter graceful stop and defer state change
+       until the running cycle naturally finishes. */
+    if (pi->state == 1 || pi->state == 2) {
+        pi->run_loop_mode = 0;
+        pi->ai_next_state = next;
+    } else {
+        pi->ai_next_state = -1;
+        ai_apply_state(pi, next, now);
+    }
 }
 
 static void spawn_pet(void)
@@ -727,6 +863,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->run_loop_mode = 0;
         pi->run_dir_x = 0;
         pi->ai_active = 0;
+        pi->ai_next_state = -1;
         pi->ai_last_interaction = GetTickCount();
         pi->prev_x = pi->x;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
@@ -741,6 +878,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->dragging = 1;
         pi->run_loop_mode = 0;
         pi->ai_active = 0;
+        pi->ai_next_state = -1;
         pi->ai_last_interaction = GetTickCount();
         POINT pt;
         GetCursorPos(&pt);
@@ -902,6 +1040,10 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
                             pi->run_dir_x = 0;
                             pi->move_dx = 0;
                             pi->move_dy = 0;
+                            if (pi->ai_active && pi->ai_next_state >= 0) {
+                                ai_apply_state(pi, pi->ai_next_state, now);
+                                pi->ai_next_state = -1;
+                            }
                         }
                     } else {
                         pi->state = 0;
@@ -910,6 +1052,10 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
                         pi->run_dir_x = 0;
                         pi->move_dx = 0;
                         pi->move_dy = 0;
+                        if (pi->ai_active && pi->ai_next_state >= 0) {
+                            ai_apply_state(pi, pi->ai_next_state, now);
+                            pi->ai_next_state = -1;
+                        }
                     }
                 } else {
                     pi->frame = 0;
@@ -1190,6 +1336,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                 PetInst *pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
                 if (pi) {
                     pi->ai_active = 0;
+                    pi->ai_next_state = -1;
                     pi->ai_last_interaction = GetTickCount();
                 }
                 /* During jumping, block all state-switching keys except left/right arrows and space (double-jump) */
