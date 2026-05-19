@@ -580,10 +580,37 @@ static void ai_update_pos(PetInst *pi)
     pi->ai_traj_t += dt * 2.0f / dscreen;
     if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
 
-    /* Place pet directly on the trajectory (absolute position) */
+    /* Compute target position from trajectory */
     ai_trajectory_point(pi, pi->ai_traj_t, &nx, &ny);
-    pi->x = margin + (int)(nx * scale_x);
-    pi->y = margin + (int)(ny * scale_y);
+    int target_x = margin + (int)(nx * scale_x);
+    int target_y = margin + (int)(ny * scale_y);
+
+    /* Boundary clamp on target */
+    if (target_x < 0) target_x = 0;
+    if (target_x > sw - PET_W) target_x = sw - PET_W;
+    if (target_y < 0) target_y = 0;
+    if (target_y > sh - PET_H) target_y = sh - PET_H;
+
+    /* Limit actual movement per tick to prevent teleportation */
+    int old_x = pi->x;
+    int old_y = pi->y;
+    int dx = target_x - old_x;
+    int dy = target_y - old_y;
+    float dist = sqrtf((float)(dx * dx) + (float)(dy * dy));
+    if (dist > 2.0f) {
+        float ratio = 2.0f / dist;
+        pi->x = old_x + (int)(dx * ratio);
+        pi->y = old_y + (int)(dy * ratio);
+    } else {
+        pi->x = target_x;
+        pi->y = target_y;
+    }
+
+    /* Final boundary clamp */
+    if (pi->x < 0) pi->x = 0;
+    if (pi->x > sw - PET_W) pi->x = sw - PET_W;
+    if (pi->y < 0) pi->y = 0;
+    if (pi->y > sh - PET_H) pi->y = sh - PET_H;
 
     SetWindowPos(pi->hwnd, NULL, pi->x, pi->y, 0, 0,
         SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
