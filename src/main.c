@@ -396,9 +396,10 @@ static void update_preview(void)
 
     g_app.preview_frame++;
     if (g_app.preview_frame >= g_frame_counts[7]) g_app.preview_frame = 0;
-    int base = g_frame_durations[7][g_app.preview_frame];
-    if (base <= 0) base = 100;
-    g_app.preview_next = now + base;
+    /* Uniform 120ms for all preview frames ensures smooth looping;
+       actual animation uses variable durations, but the small preview
+       looks better with consistent timing. */
+    g_app.preview_next = now + 120;
 
     int sx = g_app.preview_frame * CELL_W;
     int sy = 7 * CELL_H;
@@ -1142,7 +1143,7 @@ static void on_sel_change(int idx)
     SetWindowTextW(g_app.desc_label, g_app.pets[idx].desc);
     g_app.preview_state = 7;
     g_app.preview_frame = 0;
-    g_app.preview_next = GetTickCount() + g_frame_durations[7][0];
+    g_app.preview_next = GetTickCount() + 120;
     /* render first frame immediately to avoid blank period */
     if (g_app.prev_pixels) {
         Pet *p = &g_app.pets[idx];
