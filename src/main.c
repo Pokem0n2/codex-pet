@@ -576,8 +576,8 @@ static void ai_update_pos(PetInst *pi)
                           ((ny2 - ny) * scale_y) * ((ny2 - ny) * scale_y));
     if (dscreen < 0.001f) dscreen = 0.001f;
 
-    /* Advance t so that the next point is ~2 pixels away along the curve */
-    pi->ai_traj_t += dt * 2.0f / dscreen;
+    /* Advance t so that the next point is ~1 pixel away along the curve */
+    pi->ai_traj_t += dt * 1.0f / dscreen;
     if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
 
     /* Compute target position from trajectory */
@@ -597,8 +597,8 @@ static void ai_update_pos(PetInst *pi)
     int dx = target_x - old_x;
     int dy = target_y - old_y;
     float dist = sqrtf((float)(dx * dx) + (float)(dy * dy));
-    if (dist > 2.0f) {
-        float ratio = 2.0f / dist;
+    if (dist > 1.0f) {
+        float ratio = 1.0f / dist;
         pi->x = old_x + (int)(dx * ratio);
         pi->y = old_y + (int)(dy * ratio);
     } else {
@@ -730,7 +730,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         pi->ai_last_interaction = GetTickCount();
         pi->prev_x = pi->x;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
-        SetTimer(hwnd, IDT_PET, 16, NULL);
+        SetTimer(hwnd, IDT_PET, 20, NULL);
         return 0;
     }
     case WM_LBUTTONDOWN: {
@@ -848,7 +848,7 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             int dy = pi->move_dy;
             /* auto-run for a full cycle even after key release */
             if (dx == 0 && dy == 0 && pi->run_dir_x != 0) {
-                dx = pi->run_dir_x * 2;
+                dx = pi->run_dir_x * 1;
             }
             if (dx != 0) {
                 pi->x += dx;
@@ -1208,11 +1208,11 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                     pi = (PetInst *)GetWindowLongPtrW(g_focused_pet, GWLP_USERDATA);
                     if (pi) {
                         if (msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT) {
-                            pi->move_dx = (target == 1) ? 2 : -2;
+                            pi->move_dx = (target == 1) ? 1 : -1;
                             pi->move_dy = 0;
                         } else if (msg.wParam == VK_UP || msg.wParam == VK_DOWN) {
                             pi->move_dx = 0;
-                            pi->move_dy = (msg.wParam == VK_UP) ? -2 : 2;
+                            pi->move_dy = (msg.wParam == VK_UP) ? -1 : 1;
                         }
                     }
                 }
