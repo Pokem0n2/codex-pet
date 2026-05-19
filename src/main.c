@@ -597,6 +597,8 @@ static void ai_update_pos(PetInst *pi)
     pi->ai_subx -= (float)ix;
     pi->ai_suby -= (float)iy;
 
+    int old_x = pi->x;
+    int old_y = pi->y;
     pi->x += ix;
     pi->y += iy;
 
@@ -606,12 +608,14 @@ static void ai_update_pos(PetInst *pi)
     if (pi->y < 0) pi->y = 0;
     if (pi->y > sh - PET_H) pi->y = sh - PET_H;
 
-    /* If the boundary blocked movement, clear sub-pixel accumulators
-       so the pet doesn't jitter from repeated outward pushes. */
-    if ((pi->x == 0 && ix < 0) || (pi->x == sw - PET_W && ix > 0) ||
-        (pi->y == 0 && iy < 0) || (pi->y == sh - PET_H && iy > 0)) {
+    /* If completely blocked by boundary, fast-forward t to skip the
+       outward-facing segment and return early to avoid jitter. */
+    if (pi->x == old_x && pi->y == old_y && (ix != 0 || iy != 0)) {
         pi->ai_subx = 0.0f;
         pi->ai_suby = 0.0f;
+        pi->ai_traj_t += dt * 5.0f / dir_len;
+        if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
+        return;
     }
 
     SetWindowPos(pi->hwnd, NULL, pi->x, pi->y, 0, 0,
@@ -1112,9 +1116,9 @@ static LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         /* real-time running direction switch based on x delta */
         if ((pi->state == 1 || pi->state == 2) && pi->prev_x != pi->x) {
             if (pi->x > pi->prev_x && pi->state != 1) {
-                pi->state = 1; pi->frame = 0;
+                pi->state = 1; /* keep frame for smooth transition */
             } else if (pi->x < pi->prev_x && pi->state != 2) {
-                pi->state = 2; pi->frame = 0;
+                pi->state = 2; /* keep frame for smooth transition */
             }
         }
         pi->prev_x = pi->x;
