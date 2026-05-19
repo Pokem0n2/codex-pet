@@ -411,7 +411,7 @@ static void pet_trigger_anim(HWND hwnd, int target)
         return;
     }
     if (pi->jump_active && target != 4 && target != 1 && target != 2) {
-        /* Running-left/right can start from current airborne position */
+        /* Non-running temp anims land immediately */
         pi->y = pi->jump_origin_y;
         SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
             SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -439,9 +439,16 @@ static void pet_trigger_anim(HWND hwnd, int target)
         }
     } else {
         if (pi->jump_active) {
-            pi->y = pi->jump_origin_y;
-            SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
-                SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+            if (target == 1 || target == 2) {
+                /* Left/right interrupts jump: stop falling, keep current y */
+                pi->jump_active = 0;
+                pi->jump_count = 0;
+                pi->jump_vy = 0.0f;
+            } else {
+                pi->y = pi->jump_origin_y;
+                SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
+                    SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
         }
         pi->jump_active = 0;
         pi->jump_count = 0;
