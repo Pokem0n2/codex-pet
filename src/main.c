@@ -1135,6 +1135,12 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
                     pi->ai_active = 0;
                     pi->ai_last_interaction = GetTickCount();
                 }
+                /* During jumping, block all state-switching keys except left/right arrows and space (double-jump) */
+                if (pi && pi->jump_active) {
+                    if (msg.wParam != VK_LEFT && msg.wParam != VK_RIGHT && msg.wParam != VK_SPACE) {
+                        continue;
+                    }
+                }
                 /* Jumping (target==4) always calls through to allow double-jump.
                    Other temp anims skip re-trigger if already playing same state. */
                 if (!pi || !pi->alive || !pi->temp_anim || pi->state != target || target == 4) {
