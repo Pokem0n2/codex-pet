@@ -410,7 +410,8 @@ static void pet_trigger_anim(HWND hwnd, int target)
         /* max double jump reached, ignore additional presses */
         return;
     }
-    if (pi->jump_active && target != 4) {
+    if (pi->jump_active && target != 4 && target != 1 && target != 2) {
+        /* Running-left/right can start from current airborne position */
         pi->y = pi->jump_origin_y;
         SetWindowPos(hwnd, NULL, pi->x, pi->y, 0, 0,
             SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
