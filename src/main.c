@@ -54,20 +54,22 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
 
     g_app.hinst = hinst;
     g_app.selected = -1;
+    g_app.prev_w = PREV_W;
+    g_app.prev_h = PREV_H;
 
     /* 创建预览渲染缓冲区 */
     {
         HDC screen = GetDC(NULL);
         BITMAPINFO bmi = {0};
         bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmi.bmiHeader.biWidth = PREV_W;
-        bmi.bmiHeader.biHeight = -PREV_H;
+        bmi.bmiHeader.biWidth = g_app.prev_w;
+        bmi.bmiHeader.biHeight = -g_app.prev_h;
         bmi.bmiHeader.biPlanes = 1;
         bmi.bmiHeader.biBitCount = 32;
         bmi.bmiHeader.biCompression = BI_RGB;
         g_app.prev_dib = CreateDIBSection(screen, &bmi, DIB_RGB_COLORS, (void **)&g_app.prev_pixels, NULL, 0);
         g_app.prev_memdc = CreateCompatibleDC(screen);
-        SelectObject(g_app.prev_memdc, g_app.prev_dib);
+        g_app.prev_oldbmp = (HBITMAP)SelectObject(g_app.prev_memdc, g_app.prev_dib);
         ReleaseDC(NULL, screen);
     }
 
@@ -100,6 +102,17 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
     /* 消息循环 */
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
+        /* 鼠标滚轮：光标在预览区域时转发给选择器窗口 */
+        if (msg.message == WM_MOUSEWHEEL && g_app.selector) {
+            POINT pt;
+            pt.x = (short)LOWORD(msg.lParam);
+            pt.y = (short)HIWORD(msg.lParam);
+            ScreenToClient(g_app.selector, &pt);
+            if (pt.x >= 15 && pt.x < 15 + PREV_W && pt.y >= 15 && pt.y < 15 + PREV_H) {
+                SendMessage(g_app.selector, WM_MOUSEWHEEL, msg.wParam, msg.lParam);
+                continue;
+            }
+        }
         /* 方向键松开：停止奔跑 */
         if (msg.message == WM_KEYUP) {
             if ((msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT ||
@@ -224,7 +237,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
     for (int i = 0; i < g_app.pet_count; i++) free_pet(&g_app.pets[i]);
     free(g_app.pets);
     free(g_app.instances);
-    if (g_app.prev_memdc) { DeleteDC(g_app.prev_memdc); g_app.prev_memdc = NULL; }
+    if (g_app.prev_memdc) { SelectObject(g_app.prev_memdc, g_app.prev_oldbmp); DeleteDC(g_app.prev_memdc); g_app.prev_memdc = NULL; }
     if (g_app.prev_dib) { DeleteObject(g_app.prev_dib); g_app.prev_dib = NULL; }
     if (g_app.ui_font) { DeleteObject(g_app.ui_font); g_app.ui_font = NULL; }
     if (g_app.desc_font) { DeleteObject(g_app.desc_font); g_app.desc_font = NULL; }

@@ -54,8 +54,8 @@ void pet_trigger_anim(HWND hwnd, int target)
         pi->move_dy = 0;
     }
     pi->next_tick = GetTickCount() + g_frame_durations[target][0];
-    render_scaled_frame_to(pi->pet, 0, target * CELL_H, pi->dib_pixels, PET_W, PET_H);
-    present_buffer(hwnd, pi->memdc);
+    render_scaled_frame_to(pi->pet, 0, target * CELL_H, pi->dib_pixels, pi->w, pi->h);
+    present_buffer(hwnd, pi->memdc, pi->w, pi->h);
 }
 
 void ai_trajectory_point(PetInst *pi, float t, float *nx, float *ny)
@@ -126,8 +126,8 @@ void ai_update_pos(PetInst *pi)
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);
     int margin = 20;
-    float scale_x = (float)(sw - PET_W - 2 * margin);
-    float scale_y = (float)(sh - PET_H - 2 * margin);
+    float scale_x = (float)(sw - pi->w - 2 * margin);
+    float scale_y = (float)(sh - pi->h - 2 * margin);
 
     float t = pi->ai_traj_t;
     float nx, ny;
@@ -162,9 +162,9 @@ void ai_update_pos(PetInst *pi)
 
     /* 边界限制 */
     if (pi->x < 0) pi->x = 0;
-    if (pi->x > sw - PET_W) pi->x = sw - PET_W;
+    if (pi->x > sw - pi->w) pi->x = sw - pi->w;
     if (pi->y < 0) pi->y = 0;
-    if (pi->y > sh - PET_H) pi->y = sh - PET_H;
+    if (pi->y > sh - pi->h) pi->y = sh - pi->h;
 
     /* 完全被边界阻挡时快进 t，避免抖动 */
     if (pi->x == old_x && pi->y == old_y && (ix != 0 || iy != 0)) {
@@ -279,8 +279,8 @@ void ai_apply_state(PetInst *pi, int state, DWORD now)
     pi->ai_subx = 0.0f;
     pi->ai_suby = 0.0f;
 
-    render_scaled_frame_to(pi->pet, 0, state * CELL_H, pi->dib_pixels, PET_W, PET_H);
-    present_buffer(pi->hwnd, pi->memdc);
+    render_scaled_frame_to(pi->pet, 0, state * CELL_H, pi->dib_pixels, pi->w, pi->h);
+    present_buffer(pi->hwnd, pi->memdc, pi->w, pi->h);
 }
 
 void ai_pick_action(PetInst *pi, DWORD now)
@@ -298,7 +298,7 @@ void ai_pick_action(PetInst *pi, DWORD now)
     if ((pi->state != 1 && pi->state != 2) && (next == 1 || next == 2)) {
         int sw = GetSystemMetrics(SM_CXSCREEN);
         int margin = 20;
-        float scale_x = (float)(sw - PET_W - 2 * margin);
+        float scale_x = (float)(sw - pi->w - 2 * margin);
         if (scale_x > 0.0f) {
             pi->ai_traj_t = (float)(pi->x - margin) / scale_x;
             if (pi->ai_traj_t < 0.0f) pi->ai_traj_t = 0.0f;

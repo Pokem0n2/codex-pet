@@ -72,6 +72,7 @@ typedef struct PetInst {
     HBITMAP oldbmp;
     HBITMAP dib;
     BYTE *dib_pixels;
+    int w, h;               /* 实例渲染尺寸 */
     /* 拖拽状态 */
     int dragging;
     int drag_anchor_x;
@@ -118,6 +119,7 @@ typedef struct {
     HWND preview;
     HWND combobox;
     HWND desc_label;
+    HWND hint_label;
     HFONT ui_font;
     HFONT desc_font;
     PetInst *instances;
@@ -127,7 +129,9 @@ typedef struct {
     DWORD preview_next;
     HDC prev_memdc;
     HBITMAP prev_dib;
+    HBITMAP prev_oldbmp;
     BYTE *prev_pixels;
+    int prev_w, prev_h;
 } App;
 
 extern App g_app;

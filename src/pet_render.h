@@ -14,9 +14,15 @@ void render_frame_to_buffer(Pet *pet, int fx, int fy, BYTE *dst);
 void render_scaled_frame_to(Pet *pet, int fx, int fy, BYTE *dst, int dw, int dh);
 
 /* 使用分层窗口将 memdc 内容呈现到窗口上 */
-void present_buffer(HWND hwnd, HDC memdc);
+void present_buffer(HWND hwnd, HDC memdc, int w, int h);
 
 /* 更新预览动画帧 */
 void update_preview(void);
+
+/* 将精灵帧居中渲染到固定大小预览缓冲区 */
+void render_preview_frame(Pet *pet, int fx, int fy);
+
+/* 根据当前 prev_w/prev_h 重建预览 DIB 缓冲区 */
+void recreate_preview_buffer(void);
 
 #endif /* PET_RENDER_H */

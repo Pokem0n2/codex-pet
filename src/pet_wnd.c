@@ -11,10 +11,11 @@ void spawn_pet(void)
     if (!load_pet(p)) return;
     if (g_app.instance_count >= MAX_INSTANCES) return;
 
+    int pw = g_app.prev_w, ph = g_app.prev_h;
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);
-    int x = rand() % (sw - PET_W);
-    int y = rand() % (sh - PET_H);
+    int x = rand() % (sw - pw);
+    int y = rand() % (sh - ph);
 
     int idx = -1;
     for (int i = 0; i < MAX_INSTANCES; i++) {
@@ -25,13 +26,15 @@ void spawn_pet(void)
     PetInst *pi = &g_app.instances[idx];
     memset(pi, 0, sizeof(PetInst));
     pi->pet = p;
+    pi->w = pw;
+    pi->h = ph;
     pi->x = x;
     pi->y = y;
     pi->prev_x = x;
     pi->alive = 1;
 
     HWND hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
-        L"PetWindow", p->name, WS_POPUP, x, y, PET_W, PET_H, NULL, NULL, g_app.hinst, pi);
+        L"PetWindow", p->name, WS_POPUP, x, y, pw, ph, NULL, NULL, g_app.hinst, pi);
     if (!hwnd) { pi->alive = 0; return; }
 
     g_app.instance_count++;
@@ -39,8 +42,8 @@ void spawn_pet(void)
 
     /* 立即渲染第一帧 */
     ensure_buffer(pi);
-    render_scaled_frame_to(p, 0, 0, pi->dib_pixels, PET_W, PET_H);
-    present_buffer(hwnd, pi->memdc);
+    render_scaled_frame_to(p, 0, 0, pi->dib_pixels, pi->w, pi->h);
+    present_buffer(hwnd, pi->memdc, pi->w, pi->h);
 
     /* 保持焦点在组合框，确保方向键和回车键继续工作 */
     SetFocus(g_app.combobox);
@@ -198,8 +201,8 @@ LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             pi->next_tick = now + adj;
         }
         render_scaled_frame_to(pi->pet, pi->frame * CELL_W, pi->state * CELL_H,
-            pi->dib_pixels, PET_W, PET_H);
-        present_buffer(hwnd, pi->memdc);
+            pi->dib_pixels, pi->w, pi->h);
+        present_buffer(hwnd, pi->memdc, pi->w, pi->h);
         return 0;
     }
     case WM_LBUTTONUP: {
@@ -211,8 +214,8 @@ LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         reset_pet_state(pi);
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
         /* 立即渲染闲置帧 */
-        render_scaled_frame_to(pi->pet, 0, 0, pi->dib_pixels, PET_W, PET_H);
-        present_buffer(hwnd, pi->memdc);
+        render_scaled_frame_to(pi->pet, 0, 0, pi->dib_pixels, pi->w, pi->h);
+        present_buffer(hwnd, pi->memdc, pi->w, pi->h);
         return 0;
     }
     case WM_TIMER: {
@@ -263,14 +266,14 @@ LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
                 pi->x += dx;
                 int sw = GetSystemMetrics(SM_CXSCREEN);
                 if (pi->x < 0) pi->x = 0;
-                if (pi->x > sw - PET_W) pi->x = sw - PET_W;
+                if (pi->x > sw - pi->w) pi->x = sw - pi->w;
                 moved = 1;
             }
             if (dy != 0) {
                 pi->y += dy;
                 int sh = GetSystemMetrics(SM_CYSCREEN);
                 if (pi->y < 0) pi->y = 0;
-                if (pi->y > sh - PET_H) pi->y = sh - PET_H;
+                if (pi->y > sh - pi->h) pi->y = sh - pi->h;
                 moved = 1;
             }
             if (moved) {
@@ -336,8 +339,8 @@ LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 
         if (needs_render) {
             render_scaled_frame_to(pi->pet, pi->frame * CELL_W, pi->state * CELL_H,
-                pi->dib_pixels, PET_W, PET_H);
-            present_buffer(hwnd, pi->memdc);
+                pi->dib_pixels, pi->w, pi->h);
+            present_buffer(hwnd, pi->memdc, pi->w, pi->h);
         }
         return 0;
     }
@@ -362,6 +365,31 @@ void draw_text_with_spacing(HDC hdc, RECT *rc, const wchar_t *text, int spacing)
     DrawTextW(hdc, text, -1, rc, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL);
 }
 
+/* 根据当前预览尺寸重新布局选择器窗口的控件和窗口大小 */
+static void layout_selector(void)
+{
+    if (!g_app.selector) return;
+    int pw = g_app.prev_w, ph = g_app.prev_h;
+    int ctrl_x = pw + 30;
+    if (ctrl_x < 130) ctrl_x = 130;
+    int hint_y = ph + 15 - 20;
+    if (hint_y < 100) hint_y = 100;
+    int win_cx = ctrl_x + 150 + 15;
+    int win_cy = hint_y + 20 + 15;
+    if (win_cy < 136) win_cy = 136;
+
+    /* 调整选择器窗口大小 */
+    RECT rc = {0, 0, win_cx, win_cy};
+    AdjustWindowRect(&rc, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
+    SetWindowPos(g_app.selector, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top,
+        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+    /* 重新定位控件 */
+    if (g_app.combobox)   MoveWindow(g_app.combobox,   ctrl_x, 15,  150, 200, TRUE);
+    if (g_app.desc_label) MoveWindow(g_app.desc_label, ctrl_x, 40,  150, 60,  TRUE);
+    if (g_app.hint_label) MoveWindow(g_app.hint_label, ctrl_x, hint_y, 150, 20, TRUE);
+}
+
 void on_sel_change(int idx)
 {
     if (idx < 0 || idx >= g_app.pet_count) return;
@@ -376,8 +404,7 @@ void on_sel_change(int idx)
     if (g_app.prev_pixels) {
         Pet *p = &g_app.pets[idx];
         if (p && p->pixels) {
-            memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
-            render_scaled_frame_to(p, 0, 7 * CELL_H, g_app.prev_pixels, PREV_W, PREV_H);
+            render_preview_frame(p, 0, 7 * CELL_H);
         }
     }
     if (g_app.selector) {
@@ -409,17 +436,18 @@ LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             130, 40, 150, 60, hwnd, NULL, g_app.hinst, NULL);
         SendMessageW(g_app.desc_label, WM_SETFONT, (WPARAM)g_app.desc_font, TRUE);
 
-        HWND hint = CreateWindowExW(0, L"STATIC", L"ENTER: spawn    ESC: exit",
+        g_app.hint_label = CreateWindowExW(0, L"STATIC", L"ENTER: spawn    ESC: exit",
             WS_CHILD | WS_VISIBLE | SS_LEFT,
             130, 100, 150, 20, hwnd, NULL, g_app.hinst, NULL);
-        SendMessageW(hint, WM_SETFONT, (WPARAM)g_app.ui_font, TRUE);
+        SendMessageW(g_app.hint_label, WM_SETFONT, (WPARAM)g_app.ui_font, TRUE);
 
         if (g_app.pet_count > 0) {
             SendMessageW(g_app.combobox, CB_SETCURSEL, 0, 0);
             on_sel_change(0);
-            RECT rc = {15, 15, 15 + PREV_W, 15 + PREV_H};
+            RECT rc = {15, 15, 15 + g_app.prev_w, 15 + g_app.prev_h};
             InvalidateRect(hwnd, &rc, TRUE);
         }
+        layout_selector();
         SetFocus(g_app.combobox);
         return 0;
     }
@@ -460,6 +488,32 @@ LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             AlphaBlend(hdc, 15, 15, PREV_W, PREV_H, g_app.prev_memdc, 0, 0, PREV_W, PREV_H, bf);
         }
         EndPaint(hwnd, &ps);
+        return 0;
+    }
+    case WM_MOUSEWHEEL: {
+        int delta = (short)HIWORD(w);
+        float old_zoom = (float)g_app.prev_w / (float)CELL_W;
+        float new_zoom = old_zoom + (float)delta / 120.0f * 0.04f;
+        if (new_zoom < 0.25f) new_zoom = 0.25f;
+        if (new_zoom > 0.5f) new_zoom = 0.5f;
+        int nw = (int)(CELL_W * new_zoom + 0.5f);
+        int nh = (int)(CELL_H * new_zoom + 0.5f);
+        if (nw < 48) nw = 48;
+        if (nh < 52) nh = 52;
+        if (nw > PREV_W) nw = PREV_W;
+        if (nh > PREV_H) nh = PREV_H;
+        if (nw == g_app.prev_w && nh == g_app.prev_h) return 0;
+        g_app.prev_w = nw;
+        g_app.prev_h = nh;
+        /* 立即重绘居中预览 */
+        if (g_app.selected >= 0 && g_app.selected < g_app.pet_count) {
+            Pet *p = &g_app.pets[g_app.selected];
+            if (p && p->pixels) {
+                render_preview_frame(p, g_app.preview_frame * CELL_W, 7 * CELL_H);
+            }
+        }
+        RECT rc = {15, 15, 15 + PREV_W, 15 + PREV_H};
+        InvalidateRect(hwnd, &rc, TRUE);
         return 0;
     }
     case WM_DESTROY:
