@@ -51,19 +51,7 @@ void spawn_pet(void)
 
 void force_set_focus(HWND hwnd)
 {
-    /* 跨线程 SetFocus 解决方案：允许在前台线程不是当前线程时也能成功设置焦点 */
-    HWND fg = GetForegroundWindow();
-    if (!fg) { SetFocus(hwnd); return; }
-
-    DWORD fg_thread = GetWindowThreadProcessId(fg, NULL);
-    DWORD cur_thread = GetCurrentThreadId();
-    if (fg_thread != cur_thread) {
-        AttachThreadInput(fg_thread, cur_thread, TRUE);
-        SetFocus(hwnd);
-        AttachThreadInput(fg_thread, cur_thread, FALSE);
-    } else {
-        SetFocus(hwnd);
-    }
+    SetFocus(hwnd);
 }
 
 void destroy_all_pets(void)
@@ -117,20 +105,6 @@ LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)pi);
         pi->hwnd = hwnd;
         ensure_buffer(pi);
-        pi->temp_anim = 0;
-        pi->jump_active = 0;
-        pi->jump_count = 0;
-        pi->jump_vy = 0.0f;
-        pi->move_dx = 0;
-        pi->move_dy = 0;
-        pi->move_subx = 0.0f;
-        pi->move_suby = 0.0f;
-        pi->run_loop_mode = 0;
-        pi->run_dir_x = 0;
-        pi->ai_active = 0;
-        pi->ai_next_state = -1;
-        pi->ai_subx = 0.0f;
-        pi->ai_suby = 0.0f;
         pi->ai_last_interaction = GetTickCount();
         pi->prev_x = pi->x;
         pi->next_tick = GetTickCount() + g_frame_durations[0][0];
@@ -356,38 +330,13 @@ LRESULT CALLBACK PetWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
     return DefWindowProcW(hwnd, msg, w, l);
 }
 
-void draw_text_with_spacing(HDC hdc, RECT *rc, const wchar_t *text, int spacing)
+void draw_text_with_spacing(HDC hdc, RECT *rc, const wchar_t *text)
 {
     /* 使用系统 DrawText 实现自动换行，比手写循环更紧凑 */
     FillRect(hdc, rc, (HBRUSH)(COLOR_BTNFACE + 1));
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
     DrawTextW(hdc, text, -1, rc, DT_LEFT | DT_WORDBREAK | DT_EDITCONTROL);
-}
-
-/* 根据当前预览尺寸重新布局选择器窗口的控件和窗口大小 */
-static void layout_selector(void)
-{
-    if (!g_app.selector) return;
-    int pw = g_app.prev_w, ph = g_app.prev_h;
-    int ctrl_x = pw + 30;
-    if (ctrl_x < 130) ctrl_x = 130;
-    int hint_y = ph + 15 - 20;
-    if (hint_y < 100) hint_y = 100;
-    int win_cx = ctrl_x + 150 + 15;
-    int win_cy = hint_y + 20 + 15;
-    if (win_cy < 136) win_cy = 136;
-
-    /* 调整选择器窗口大小 */
-    RECT rc = {0, 0, win_cx, win_cy};
-    AdjustWindowRect(&rc, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
-    SetWindowPos(g_app.selector, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top,
-        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-
-    /* 重新定位控件 */
-    if (g_app.combobox)   MoveWindow(g_app.combobox,   ctrl_x, 15,  150, 200, TRUE);
-    if (g_app.desc_label) MoveWindow(g_app.desc_label, ctrl_x, 40,  150, 60,  TRUE);
-    if (g_app.hint_label) MoveWindow(g_app.hint_label, ctrl_x, hint_y, 150, 20, TRUE);
 }
 
 void on_sel_change(int idx)
@@ -447,7 +396,6 @@ LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             RECT rc = {15, 15, 15 + g_app.prev_w, 15 + g_app.prev_h};
             InvalidateRect(hwnd, &rc, TRUE);
         }
-        layout_selector();
         SetFocus(g_app.combobox);
         return 0;
     }
@@ -462,7 +410,7 @@ LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
             HFONT oldFont = (HFONT)SelectObject(dis->hDC, hFont);
             wchar_t text[256];
             GetWindowTextW(dis->hwndItem, text, 256);
-            draw_text_with_spacing(dis->hDC, &dis->rcItem, text, 3);
+            draw_text_with_spacing(dis->hDC, &dis->rcItem, text);
             SelectObject(dis->hDC, oldFont);
             return TRUE;
         }
@@ -491,17 +439,11 @@ LRESULT CALLBACK SelWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         return 0;
     }
     case WM_MOUSEWHEEL: {
-        int delta = (short)HIWORD(w);
-        float old_zoom = (float)g_app.prev_w / (float)CELL_W;
-        float new_zoom = old_zoom + (float)delta / 120.0f * 0.04f;
-        if (new_zoom < 0.25f) new_zoom = 0.25f;
-        if (new_zoom > 0.5f) new_zoom = 0.5f;
-        int nw = (int)(CELL_W * new_zoom + 0.5f);
-        int nh = (int)(CELL_H * new_zoom + 0.5f);
+        int d = (short)HIWORD(w) > 0 ? 4 : -4;
+        int nw = g_app.prev_w + d;
         if (nw < 48) nw = 48;
-        if (nh < 52) nh = 52;
         if (nw > PREV_W) nw = PREV_W;
-        if (nh > PREV_H) nh = PREV_H;
+        int nh = nw * CELL_H / CELL_W;
         if (nw == g_app.prev_w && nh == g_app.prev_h) return 0;
         g_app.prev_w = nw;
         g_app.prev_h = nh;

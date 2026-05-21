@@ -9,6 +9,13 @@ App g_app = {0};
 HWND g_focused_pet = NULL;
 wchar_t g_base_dir[MAX_PATH];
 
+static int is_pet_wnd(HWND h)
+{
+    wchar_t cn[16];
+    GetClassNameW(h, cn, 16);
+    return !wcscmp(cn, L"PetWindow");
+}
+
 /* MSVC 浮点支持符号（无 CRT 时需要） */
 #ifdef _MSC_VER
 int _fltused = 0;
@@ -46,7 +53,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
     scan_pets();
 
     if (g_app.pet_count == 0) {
-        MessageBoxW(NULL, L"No pets found in my-pet/ directory", L"Error", MB_OK);
+        MessageBoxW(NULL, L"No pets found", L"Error", MB_OK);
         IWICImagingFactory_Release(g_app.wic);
         CoUninitialize();
         return 1;
@@ -91,7 +98,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
     /* 创建选择器窗口 */
     RECT rc = {0, 0, 300, 136};
     AdjustWindowRect(&rc, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
-    g_app.selector = CreateWindowExW(0, L"PetSelector", L"CodeX-Pet-3.0",
+    g_app.selector = CreateWindowExW(0, L"PetSelector", L"CodeX-Pet",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hinst, NULL);
 
@@ -137,9 +144,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
             if (msg.wParam == VK_ESCAPE) {
                 HWND focus = GetFocus();
                 if (focus) {
-                    wchar_t cn[64];
-                    GetClassNameW(focus, cn, 64);
-                    if (wcscmp(cn, L"PetWindow") == 0) {
+                    if (is_pet_wnd(focus)) {
                         DestroyWindow(focus);
                         continue;
                     }
@@ -177,12 +182,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
                 if (msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT ||
                     msg.wParam == VK_UP   || msg.wParam == VK_DOWN) {
                     HWND focus = GetFocus();
-                    int on_pet = 0;
-                    if (focus) {
-                        wchar_t cn[64];
-                        GetClassNameW(focus, cn, 64);
-                        on_pet = (wcscmp(cn, L"PetWindow") == 0);
-                    }
+                    int on_pet = focus && is_pet_wnd(focus);
                     if (!on_pet) {
                         TranslateMessage(&msg);
                         DispatchMessage(&msg);

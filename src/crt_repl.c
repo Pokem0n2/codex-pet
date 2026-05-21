@@ -84,14 +84,11 @@ wchar_t *wcsrchr(const wchar_t *s, wchar_t c)
 
 char *strstr(const char *haystack, const char *needle)
 {
-    size_t nlen = strlen(needle);
-    if (!nlen) return (char *)haystack;
+    if (!*needle) return (char *)haystack;
     while (*haystack) {
-        if (*haystack == *needle) {
-            size_t i;
-            for (i = 0; i < nlen && haystack[i] == needle[i]; i++);
-            if (i == nlen) return (char *)haystack;
-        }
+        const char *h = haystack, *n = needle;
+        while (*h && *n && *h == *n) { h++; n++; }
+        if (!*n) return (char *)haystack;
         haystack++;
     }
     return NULL;

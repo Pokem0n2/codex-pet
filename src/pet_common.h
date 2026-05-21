@@ -30,24 +30,13 @@
 
 #define AI_TIMEOUT      10000
 
-#define TRAJ_LINE       0
-#define TRAJ_RECT       1
-#define TRAJ_TRI        2
-#define TRAJ_POLY       3
-#define TRAJ_CIRCLE     4
-#define TRAJ_ELLIPSE    5
-#define TRAJ_FIGURE8    6
-#define TRAJ_ARC        7
-#define TRAJ_ZIGZAG     8
-#define TRAJ_CYCLE      9
-
 #define PI 3.14159265f
 
 /* 每行动画帧数（仅在 pet_data.c 中定义） */
-extern const int g_frame_counts[ROWS];
+extern const unsigned char g_frame_counts[ROWS];
 
 /* 每帧持续时间（毫秒），仅在 pet_data.c 中定义 */
-extern const int g_frame_durations[ROWS][8];
+extern const short g_frame_durations[ROWS][8];
 
 /* ---------- 数据结构 ---------- */
 typedef struct Pet {
@@ -100,9 +89,7 @@ typedef struct PetInst {
     DWORD ai_last_interaction;
     DWORD ai_next_action;
     int ai_next_state;
-    int ai_traj_type;
     float ai_traj_t;
-    float ai_traj_speed;
     float ai_subx;
     float ai_suby;
     int ai_p1;
@@ -116,7 +103,6 @@ typedef struct {
     int pet_count;
     int selected;
     HWND selector;
-    HWND preview;
     HWND combobox;
     HWND desc_label;
     HWND hint_label;

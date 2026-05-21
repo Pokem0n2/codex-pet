@@ -4,12 +4,12 @@ cd /d %~dp0
 
 if not exist obj32 mkdir obj32
 
-echo [1/3] Compile x86 no-CRT
-cl /O1 /GS- /Gy /W3 /utf-8 /D_CRT_SECURE_NO_WARNINGS /DUNICODE /D_UNICODE /DINITGUID /DCOBJMACROS /DNDEBUG /nologo /c /Fo:obj32\ src\main.c src\pet_json.c src\pet_io.c src\pet_render.c src\pet_ai.c src\pet_wnd.c src\pet_data.c src\crt_repl.c
+echo [1/3] Compile x86 no-CRT (single unit)
+cl /O1 /GS- /Gy /W3 /utf-8 /D_CRT_SECURE_NO_WARNINGS /DUNICODE /D_UNICODE /DINITGUID /DCOBJMACROS /DNDEBUG /nologo /c /Fo:obj32\all.obj src\all.c
 if errorlevel 1 goto :err
 
 echo [2/3] Link
-link /SUBSYSTEM:WINDOWS /ENTRY:WinMain /NODEFAULTLIB /MERGE:.rdata=.text /FIXED /OPT:REF /OPT:ICF /PDB:NONE /OUT:codex-pet-raw.exe obj32\main.obj obj32\pet_json.obj obj32\pet_io.obj obj32\pet_render.obj obj32\pet_ai.obj obj32\pet_wnd.obj obj32\pet_data.obj obj32\crt_repl.obj kernel32.lib user32.lib gdi32.lib ole32.lib windowscodecs.lib uuid.lib msimg32.lib shell32.lib
+link /SUBSYSTEM:WINDOWS /ENTRY:WinMain /NODEFAULTLIB /MERGE:.rdata=.text /FIXED /OPT:REF /OPT:ICF /PDB:NONE /OUT:codex-pet-raw.exe obj32\all.obj kernel32.lib user32.lib gdi32.lib ole32.lib windowscodecs.lib uuid.lib msimg32.lib
 if errorlevel 1 goto :err
 
 echo [3/3] UPX compress

@@ -1,0 +1,244 @@
+ codex-pet-raw
+
+ Timestamp is 6a0e6446 (Thu May 21 09:47:50 2026)
+
+ Preferred load address is 00400000
+
+ Start         Length     Name                   Class
+ 0001:00000000 00000464H .rdata                  CODE
+ 0001:00000464 00000028H .rdata$voltmd           CODE
+ 0001:0000048c 000000dcH .rdata$zzzdbg           CODE
+ 0001:00000568 00002ba4H .text$mn                CODE
+ 0001:0000310c 00000000H .edata                  CODE
+ 0002:00000000 00000020H .data                   DATA
+ 0002:00000020 00000288H .bss                    DATA
+ 0003:00000000 0000011cH .idata$5                DATA
+ 0003:0000011c 00000064H .idata$2                DATA
+ 0003:00000180 00000014H .idata$3                DATA
+ 0003:00000194 0000011cH .idata$4                DATA
+ 0003:000002b0 00000470H .idata$6                DATA
+
+  Address         Publics by Value              Rva+Base       Lib:Object
+
+ 0000:00000000       ___AbsoluteZero            00000000     <absolute>
+ 0000:00000000       ___arm64x_extra_rfe_table  00000000     <absolute>
+ 0000:00000000       ___arm64x_extra_rfe_table_size 00000000     <absolute>
+ 0000:00000000       ___arm64x_native_entrypoint 00000000     <absolute>
+ 0000:00000000       ___arm64x_redirection_metadata 00000000     <absolute>
+ 0000:00000000       ___arm64x_redirection_metadata_count 00000000     <absolute>
+ 0000:00000000       ___dynamic_value_reloc_table 00000000     <absolute>
+ 0000:00000000       ___enclave_config          00000000     <absolute>
+ 0000:00000000       ___guard_check_icall_a64n_fptr 00000000     <absolute>
+ 0000:00000000       ___guard_eh_cont_count     00000000     <absolute>
+ 0000:00000000       ___guard_eh_cont_table     00000000     <absolute>
+ 0000:00000000       ___guard_fids_count        00000000     <absolute>
+ 0000:00000000       ___guard_fids_table        00000000     <absolute>
+ 0000:00000000       ___guard_iat_count         00000000     <absolute>
+ 0000:00000000       ___guard_iat_table         00000000     <absolute>
+ 0000:00000000       ___guard_longjmp_count     00000000     <absolute>
+ 0000:00000000       ___guard_longjmp_table     00000000     <absolute>
+ 0000:00000000       ___hybrid_auxiliary_delayload_iat 00000000     <absolute>
+ 0000:00000000       ___hybrid_auxiliary_delayload_iat_copy 00000000     <absolute>
+ 0000:00000000       ___hybrid_auxiliary_iat    00000000     <absolute>
+ 0000:00000000       ___hybrid_auxiliary_iat_copy 00000000     <absolute>
+ 0000:00000000       ___hybrid_code_map         00000000     <absolute>
+ 0000:00000000       ___hybrid_code_map_count   00000000     <absolute>
+ 0000:00000000       ___hybrid_image_info_bitfield 00000000     <absolute>
+ 0000:00000000       ___safe_se_handler_count   00000000     <absolute>
+ 0000:00000000       ___safe_se_handler_table   00000000     <absolute>
+ 0000:00000000       ___x64_code_ranges_to_entry_points 00000000     <absolute>
+ 0000:00000000       ___x64_code_ranges_to_entry_points_count 00000000     <absolute>
+ 0000:00000100       ___guard_flags             00000100     <absolute>
+ 0001:00000000       _CLSID_WICImagingFactory2  00401000     main.obj
+ 0001:00000010       _GUID_WICPixelFormat32bppPBGRA 00401010     main.obj
+ 0001:00000020       ??_C@_1M@ILHOPKA@?$AAE?$AAr?$AAr?$AAo?$AAr@ 00401020     main.obj
+ 0001:00000030       ??_C@_1EG@EEHACJDA@?$AAN?$AAo?$AA?5?$AAp?$AAe?$AAt?$AAs?$AA?5?$AAf?$AAo?$AAu?$AAn?$AAd?$AA?5?$AAi@ 00401030     main.obj
+ 0001:00000078       ??_C@_1BI@IMMJBHOE@?$AAP?$AAe?$AAt?$AAS?$AAe?$AAl?$AAe?$AAc?$AAt?$AAo?$AAr@ 00401078     main.obj
+ 0001:00000090       ??_C@_1BE@EOIKLBIE@?$AAP?$AAe?$AAt?$AAW?$AAi?$AAn?$AAd?$AAo?$AAw@ 00401090     main.obj
+ 0001:000000a4       ??_C@_1BM@BDJAOMMF@?$AAC?$AAo?$AAd?$AAe?$AAX?$AA?9?$AAP?$AAe?$AAt?$AA?9?$AA3?$AA?4?$AA0@ 004010a4     main.obj
+ 0001:000000c0       __xmm@000000880000012c0000000000000000 004010c0     main.obj
+ 0001:000000d0       ??_C@_1BC@HLFKNEDB@?$AAm?$AAy?$AA?9?$AAp?$AAe?$AAt?$AA?2?$AA?$CK@ 004010d0     pet_io.obj
+ 0001:000000e4       ??_C@_13JOFGPIOO@?$AA?4@   004010e4     pet_io.obj
+ 0001:000000e8       ??_C@_15DDHGOCBH@?$AA?4?$AA?4@ 004010e8     pet_io.obj
+ 0001:000000f0       ??_C@_1BA@JOMCDJON@?$AAm?$AAy?$AA?9?$AAp?$AAe?$AAt?$AA?2@ 004010f0     pet_io.obj
+ 0001:00000100       ??_C@_1BE@LINAJNLO@?$AA?2?$AAp?$AAe?$AAt?$AA?4?$AAj?$AAs?$AAo?$AAn@ 00401100     pet_io.obj
+ 0001:00000114       ??_C@_04CMJOOJND@?$CCid?$CC@ 00401114     pet_io.obj
+ 0001:0000011c       ??_C@_0O@IGHCHPMP@?$CCdisplayName?$CC@ 0040111c     pet_io.obj
+ 0001:0000012c       ??_C@_0O@FOFDIHEA@?$CCdescription?$CC@ 0040112c     pet_io.obj
+ 0001:0000013c       ??_C@_0BC@PAAMIALC@?$CCspritesheetPath?$CC@ 0040113c     pet_io.obj
+ 0001:00000150       ??_C@_1CC@KEHMMHHH@?$AAs?$AAp?$AAr?$AAi?$AAt?$AAe?$AAs?$AAh?$AAe?$AAe?$AAt?$AA?4?$AAw?$AAe?$AAb@ 00401150     pet_io.obj
+ 0001:00000174       ??_C@_13FPGAJAPJ@?$AA?2@   00401174     pet_io.obj
+ 0001:00000208       __real@38d1b717            00401208     pet_ai.obj
+ 0001:0000020c       __real@3a03126e            0040120c     pet_ai.obj
+ 0001:00000210       __real@3a83126f            00401210     pet_ai.obj
+ 0001:00000214       __real@3e000000            00401214     pet_ai.obj
+ 0001:00000218       __real@3e99999a            00401218     pet_ai.obj
+ 0001:0000021c       __real@3ecccccd            0040121c     pet_ai.obj
+ 0001:00000220       __real@3f000000            00401220     pet_ai.obj
+ 0001:00000224       __real@3f800000            00401224     pet_ai.obj
+ 0001:00000228       __real@40490fdb            00401228     pet_ai.obj
+ 0001:0000022c       __real@40800000            0040122c     pet_ai.obj
+ 0001:00000230       __real@40c90fdb            00401230     pet_ai.obj
+ 0001:00000234       __real@41000000            00401234     pet_ai.obj
+ 0001:00000238       __real@41490fdb            00401238     pet_ai.obj
+ 0001:0000023c       __real@46fffe00            0040123c     pet_ai.obj
+ 0001:00000240       __real@c121999a            00401240     pet_ai.obj
+ 0001:00000244       __real@c144cccd            00401244     pet_ai.obj
+ 0001:00000248       ??_C@_1BC@LGNOKEPM@?$AAC?$AAO?$AAM?$AAB?$AAO?$AAB?$AAO?$AAX@ 00401248     pet_wnd.obj
+ 0001:0000025c       ??_C@_1BK@HILIMCKO@?$AAS?$AAe?$AAl?$AAe?$AAc?$AAt?$AA?5?$AAa?$AA?5?$AAp?$AAe?$AAt@ 0040125c     pet_wnd.obj
+ 0001:00000278       ??_C@_1O@ELLBDENI@?$AAS?$AAT?$AAA?$AAT?$AAI?$AAC@ 00401278     pet_wnd.obj
+ 0001:00000288       ??_C@_1DE@EILGGFFA@?$AAE?$AAN?$AAT?$AAE?$AAR?$AA?3?$AA?5?$AAs?$AAp?$AAa?$AAw?$AAn?$AA?5?$AA?5?$AA?5@ 00401288     pet_wnd.obj
+ 0001:000002bc       __real@3f19999a            004012bc     pet_wnd.obj
+ 0001:000002c0       __real@40400000            004012c0     pet_wnd.obj
+ 0001:000002d0       __xmm@000000770000006f0000000f0000000f 004012d0     pet_wnd.obj
+ 0001:000002e0       __xmm@41f00000000000000000000000000000 004012e0     pet_wnd.obj
+ 0001:000002f0       _g_frame_counts            004012f0     pet_data.obj
+ 0001:00000318       _g_frame_durations         00401318     pet_data.obj
+ 0001:00000438       _IID_IWICImagingFactory    00401438     windowscodecs:guids.obj
+ 0001:00000464       ___volatile_metadata       00401464     <linker-defined>
+ 0001:00000568       _WinMain@16                00401568 f   main.obj
+ 0001:00000c53       _json_copy_str             00401c53 f   pet_json.obj
+ 0001:00000c8f       _json_find_value           00401c8f f   pet_json.obj
+ 0001:00000cee       _free_pet                  00401cee f   pet_io.obj
+ 0001:00000d10       _init_base_dir             00401d10 f   pet_io.obj
+ 0001:00000d3a       _load_pet                  00401d3a f   pet_io.obj
+ 0001:00000e9c       _scan_pets                 00401e9c f   pet_io.obj
+ 0001:00001231       _ensure_buffer             00402231 f   pet_render.obj
+ 0001:0000130e       _free_buffer               0040230e f   pet_render.obj
+ 0001:00001354       _present_buffer            00402354 f   pet_render.obj
+ 0001:000013a9       _render_frame_to_buffer    004023a9 f   pet_render.obj
+ 0001:0000144b       _render_preview_frame      0040244b f   pet_render.obj
+ 0001:0000151f       _render_scaled_frame_to    0040251f f   pet_render.obj
+ 0001:000015e0       _update_preview            004025e0 f   pet_render.obj
+ 0001:0000165a       _ai_apply_state            0040265a f   pet_ai.obj
+ 0001:00001743       _ai_pick_action            00402743 f   pet_ai.obj
+ 0001:00001881       _ai_state_duration         00402881 f   pet_ai.obj
+ 0001:00001921       _ai_trajectory_point       00402921 f   pet_ai.obj
+ 0001:00001c65       _ai_update_pos             00402c65 f   pet_ai.obj
+ 0001:00001eab       _ai_weighted_state         00402eab f   pet_ai.obj
+ 0001:00001f4e       _pet_trigger_anim          00402f4e f   pet_ai.obj
+ 0001:000020df       _PetWndProc@16             004030df f   pet_wnd.obj
+ 0001:000027ce       _SelWndProc@16             004037ce f   pet_wnd.obj
+ 0001:00002c01       _destroy_all_pets          00403c01 f   pet_wnd.obj
+ 0001:00002c2f       _draw_text_with_spacing    00403c2f f   pet_wnd.obj
+ 0001:00002c75       _force_set_focus           00403c75 f   pet_wnd.obj
+ 0001:00002cc5       _on_sel_change             00403cc5 f   pet_wnd.obj
+ 0001:00002dc6       _spawn_pet                 00403dc6 f   pet_wnd.obj
+ 0001:00002f2c       __time64                   00403f2c f   crt_repl.obj
+ 0001:00002f4b       _calloc                    00403f4b f   crt_repl.obj
+ 0001:00002f65       _cos                       00403f65 f   crt_repl.obj
+ 0001:00002f6c       _free                      00403f6c f   crt_repl.obj
+ 0001:00002f87       _malloc                    00403f87 f   crt_repl.obj
+ 0001:00002f9b       _memcpy                    00403f9b f   crt_repl.obj
+ 0001:00002fbf       _memset                    00403fbf f   crt_repl.obj
+ 0001:00002fed       _rand                      00403fed f   crt_repl.obj
+ 0001:0000300a       _sin                       0040400a f   crt_repl.obj
+ 0001:00003011       _sqrt                      00404011 f   crt_repl.obj
+ 0001:00003018       _srand                     00404018 f   crt_repl.obj
+ 0001:00003022       _strlen                    00404022 f   crt_repl.obj
+ 0001:00003034       _strstr                    00404034 f   crt_repl.obj
+ 0001:00003078       _wcscmp                    00404078 f   crt_repl.obj
+ 0001:000030aa       _wcscpy                    004040aa f   crt_repl.obj
+ 0001:000030c8       _wcslen                    004040c8 f   crt_repl.obj
+ 0001:000030dc       _wcsrchr                   004040dc f   crt_repl.obj
+ 0002:00000020       _g_app                     00405020     main.obj
+ 0002:0000007c       _g_focused_pet             0040507c     main.obj
+ 0002:00000080       __fltused                  00405080     main.obj
+ 0002:000000a0       _g_base_dir                004050a0     <common>
+ 0003:00000000       __imp__CreateCompatibleDC@4 00406000     gdi32:GDI32.dll
+ 0003:00000004       __imp__CreateDIBSection@24 00406004     gdi32:GDI32.dll
+ 0003:00000008       __imp__CreateFontW@56      00406008     gdi32:GDI32.dll
+ 0003:0000000c       __imp__SetBkMode@8         0040600c     gdi32:GDI32.dll
+ 0003:00000010       __imp__SetTextColor@8      00406010     gdi32:GDI32.dll
+ 0003:00000014       __imp__DeleteObject@4      00406014     gdi32:GDI32.dll
+ 0003:00000018       __imp__DeleteDC@4          00406018     gdi32:GDI32.dll
+ 0003:0000001c       __imp__SelectObject@8      0040601c     gdi32:GDI32.dll
+ 0003:00000020       \177GDI32_NULL_THUNK_DATA  00406020     gdi32:GDI32.dll
+ 0003:00000024       __imp__MultiByteToWideChar@24 00406024     kernel32:KERNEL32.dll
+ 0003:00000028       __imp__GetCurrentThreadId@0 00406028     kernel32:KERNEL32.dll
+ 0003:0000002c       __imp__CloseHandle@4       0040602c     kernel32:KERNEL32.dll
+ 0003:00000030       __imp__HeapFree@12         00406030     kernel32:KERNEL32.dll
+ 0003:00000034       __imp__GetProcessHeap@0    00406034     kernel32:KERNEL32.dll
+ 0003:00000038       __imp__ReadFile@20         00406038     kernel32:KERNEL32.dll
+ 0003:0000003c       __imp__GetFileSize@8       0040603c     kernel32:KERNEL32.dll
+ 0003:00000040       __imp__GetModuleFileNameW@12 00406040     kernel32:KERNEL32.dll
+ 0003:00000044       __imp__FindNextFileW@8     00406044     kernel32:KERNEL32.dll
+ 0003:00000048       __imp__FindFirstFileW@8    00406048     kernel32:KERNEL32.dll
+ 0003:0000004c       __imp__FindClose@4         0040604c     kernel32:KERNEL32.dll
+ 0003:00000050       __imp__CreateFileW@28      00406050     kernel32:KERNEL32.dll
+ 0003:00000054       __imp__HeapAlloc@12        00406054     kernel32:KERNEL32.dll
+ 0003:00000058       __imp__GetTickCount@0      00406058     kernel32:KERNEL32.dll
+ 0003:0000005c       \177KERNEL32_NULL_THUNK_DATA 0040605c     kernel32:KERNEL32.dll
+ 0003:00000060       __imp__AlphaBlend@44       00406060     msimg32:MSIMG32.dll
+ 0003:00000064       \177MSIMG32_NULL_THUNK_DATA 00406064     msimg32:MSIMG32.dll
+ 0003:00000068       __imp__GetSystemMetrics@4  00406068     user32:USER32.dll
+ 0003:0000006c       __imp__UpdateWindow@4      0040606c     user32:USER32.dll
+ 0003:00000070       __imp__GetDC@4             00406070     user32:USER32.dll
+ 0003:00000074       __imp__ReleaseDC@8         00406074     user32:USER32.dll
+ 0003:00000078       __imp__AdjustWindowRect@12 00406078     user32:USER32.dll
+ 0003:0000007c       __imp__MessageBoxW@16      0040607c     user32:USER32.dll
+ 0003:00000080       __imp__ScreenToClient@8    00406080     user32:USER32.dll
+ 0003:00000084       __imp__GetWindowLongW@8    00406084     user32:USER32.dll
+ 0003:00000088       __imp__GetClassNameW@12    00406088     user32:USER32.dll
+ 0003:0000008c       __imp__SetTimer@16         0040608c     user32:USER32.dll
+ 0003:00000090       __imp__UpdateLayeredWindow@36 00406090     user32:USER32.dll
+ 0003:00000094       __imp__SetWindowPos@28     00406094     user32:USER32.dll
+ 0003:00000098       __imp__AttachThreadInput@12 00406098     user32:USER32.dll
+ 0003:0000009c       __imp__DefWindowProcW@16   0040609c     user32:USER32.dll
+ 0003:000000a0       __imp__SetFocus@4          004060a0     user32:USER32.dll
+ 0003:000000a4       __imp__SetCapture@4        004060a4     user32:USER32.dll
+ 0003:000000a8       __imp__ReleaseCapture@0    004060a8     user32:USER32.dll
+ 0003:000000ac       __imp__DrawTextW@20        004060ac     user32:USER32.dll
+ 0003:000000b0       __imp__GetForegroundWindow@0 004060b0     user32:USER32.dll
+ 0003:000000b4       __imp__BeginPaint@8        004060b4     user32:USER32.dll
+ 0003:000000b8       __imp__EndPaint@8          004060b8     user32:USER32.dll
+ 0003:000000bc       __imp__InvalidateRect@12   004060bc     user32:USER32.dll
+ 0003:000000c0       __imp__SetWindowTextW@8    004060c0     user32:USER32.dll
+ 0003:000000c4       __imp__GetWindowTextW@12   004060c4     user32:USER32.dll
+ 0003:000000c8       __imp__GetCursorPos@4      004060c8     user32:USER32.dll
+ 0003:000000cc       __imp__GetSysColor@4       004060cc     user32:USER32.dll
+ 0003:000000d0       __imp__FillRect@12         004060d0     user32:USER32.dll
+ 0003:000000d4       __imp__SetWindowLongW@12   004060d4     user32:USER32.dll
+ 0003:000000d8       __imp__GetWindowThreadProcessId@8 004060d8     user32:USER32.dll
+ 0003:000000dc       __imp__GetMessageW@16      004060dc     user32:USER32.dll
+ 0003:000000e0       __imp__GetFocus@0          004060e0     user32:USER32.dll
+ 0003:000000e4       __imp__ShowWindow@8        004060e4     user32:USER32.dll
+ 0003:000000e8       __imp__DestroyWindow@4     004060e8     user32:USER32.dll
+ 0003:000000ec       __imp__CreateWindowExW@48  004060ec     user32:USER32.dll
+ 0003:000000f0       __imp__RegisterClassW@4    004060f0     user32:USER32.dll
+ 0003:000000f4       __imp__PostQuitMessage@4   004060f4     user32:USER32.dll
+ 0003:000000f8       __imp__SendMessageW@16     004060f8     user32:USER32.dll
+ 0003:000000fc       __imp__DispatchMessageW@4  004060fc     user32:USER32.dll
+ 0003:00000100       __imp__TranslateMessage@4  00406100     user32:USER32.dll
+ 0003:00000104       __imp__LoadCursorW@8       00406104     user32:USER32.dll
+ 0003:00000108       \177USER32_NULL_THUNK_DATA 00406108     user32:USER32.dll
+ 0003:0000010c       __imp__CoCreateInstance@20 0040610c     ole32:ole32.dll
+ 0003:00000110       __imp__CoInitializeEx@8    00406110     ole32:ole32.dll
+ 0003:00000114       __imp__CoUninitialize@0    00406114     ole32:ole32.dll
+ 0003:00000118       \177ole32_NULL_THUNK_DATA  00406118     ole32:ole32.dll
+ 0003:0000011c       __IMPORT_DESCRIPTOR_KERNEL32 0040611c     kernel32:KERNEL32.dll
+ 0003:00000130       __IMPORT_DESCRIPTOR_USER32 00406130     user32:USER32.dll
+ 0003:00000144       __IMPORT_DESCRIPTOR_GDI32  00406144     gdi32:GDI32.dll
+ 0003:00000158       __IMPORT_DESCRIPTOR_ole32  00406158     ole32:ole32.dll
+ 0003:0000016c       __IMPORT_DESCRIPTOR_MSIMG32 0040616c     msimg32:MSIMG32.dll
+ 0003:00000180       __NULL_IMPORT_DESCRIPTOR   00406180     kernel32:KERNEL32.dll
+
+ entry point at        0001:00000568
+
+ Static symbols
+
+ 0001:00000178       ?tbl@?1??ai_next_state@@9@9 00401178     pet_ai.obj
+ 0001:000001c0       ?dst@?1??ai_next_state@@9@9 004011c0     pet_ai.obj
+ 0001:000011f3       _wcat                      004021f3 f   pet_io.obj
+ 0001:000012f4       _ensure_scale_buf          004022f4 f   pet_render.obj
+ 0001:00001717       _ai_next_state             00402717 f   pet_ai.obj
+ 0001:000018fd       $LN16                      004028fd     pet_ai.obj
+ 0001:00001c3d       $LN45                      00402c3d     pet_ai.obj
+ 0001:00002d92       _reset_pet_state           00403d92 f   pet_wnd.obj
+ 0002:00000000       _g_seed                    00405000     crt_repl.obj
+ 0002:00000084       _g_scale_buf               00405084     pet_render.obj
+ 0003:00000390       .idata$6                   00406390     kernel32:KERNEL32.dll
+ 0003:0000062e       .idata$6                   0040662e     user32:USER32.dll
+ 0003:000006ba       .idata$6                   004066ba     gdi32:GDI32.dll
+ 0003:000006fc       .idata$6                   004066fc     ole32:ole32.dll
+ 0003:00000714       .idata$6                   00406714     msimg32:MSIMG32.dll

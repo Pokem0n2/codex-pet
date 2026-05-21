@@ -20,6 +20,6 @@ void destroy_all_pets(void);
 void on_sel_change(int idx);
 
 /* 带行距的文本绘制 */
-void draw_text_with_spacing(HDC hdc, RECT *rc, const wchar_t *text, int spacing);
+void draw_text_with_spacing(HDC hdc, RECT *rc, const wchar_t *text);
 
 #endif /* PET_WND_H */

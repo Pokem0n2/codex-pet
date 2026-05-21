@@ -60,62 +60,13 @@ void pet_trigger_anim(HWND hwnd, int target)
 
 void ai_trajectory_point(PetInst *pi, float t, float *nx, float *ny)
 {
-    *nx = 0.5f; *ny = 0.5f;
-    float a, f;
-    int n, side;
-    switch (pi->ai_traj_type) {
-    case TRAJ_LINE:
-        *nx = t;
-        *ny = 0.3f + t * 0.4f;
-        break;
-    case TRAJ_RECT:
-    case TRAJ_TRI:
-    case TRAJ_POLY: {
-        /* 统一多边形轨迹：RECT=4边, TRI=3边, POLY=3-7边 */
-        if (pi->ai_traj_type == TRAJ_RECT) n = 4;
-        else if (pi->ai_traj_type == TRAJ_TRI) n = 3;
-        else n = 3 + (pi->ai_p1 % 5);
-        float lt = t * n;
-        side = (int)lt;
-        f = lt - side;
-        float a1 = side * 2.0f * PI / n;
-        float a2 = (side + 1) * 2.0f * PI / n;
-        float c1 = cosf(a1), s1 = sinf(a1);
-        float c2 = cosf(a2), s2 = sinf(a2);
-        *nx = (0.5f + 0.5f * c1) + ((0.5f + 0.5f * c2) - (0.5f + 0.5f * c1)) * f;
-        *ny = (0.5f + 0.5f * s1) + ((0.5f + 0.5f * s2) - (0.5f + 0.5f * s1)) * f;
-        break;
-    }
-    case TRAJ_CIRCLE:
-    case TRAJ_ELLIPSE:
-    case TRAJ_ARC: {
-        /* 统一圆弧类轨迹 */
-        a = t * (pi->ai_traj_type == TRAJ_ARC ? PI : 2.0f * PI);
-        float rx = 0.5f;
-        float ry = (pi->ai_traj_type == TRAJ_ELLIPSE) ? 0.3f : 0.5f;
-        *nx = 0.5f + rx * cosf(a);
-        *ny = 0.5f + ry * sinf(a);
-        break;
-    }
-    case TRAJ_FIGURE8:
-        a = t * 2.0f * PI;
-        *nx = 0.5f + 0.4f * sinf(a);
-        *ny = 0.5f + 0.4f * sinf(2.0f * a);
-        break;
-    case TRAJ_ZIGZAG: {
-        int seg = (int)(t * 8.0f);
-        f = t * 8.0f - seg;
-        *nx = (seg + f) / 8.0f;
-        *ny = (seg % 2 == 0) ? f : 1.0f - f;
-        break;
-    }
-    case TRAJ_CYCLE: {
-        float theta = t * 4.0f * PI;
-        *nx = (theta - sinf(theta)) / (4.0f * PI);
-        *ny = (1.0f - cosf(theta)) / 2.0f;
-        break;
-    }
-    }
+    /* 统一参数曲线：通过 ai_p1/ai_p2 参数产生视觉多样性 */
+    float freq_x = 1.0f + (float)(pi->ai_p1 % 4);
+    float freq_y = 1.0f + (float)(pi->ai_p2 % 4);
+    float ax = 0.3f + 0.2f * (float)(pi->ai_p1 % 3);
+    float ay = 0.3f + 0.2f * (float)(pi->ai_p2 % 3);
+    *nx = 0.5f + ax * sinf(t * freq_x * 2.0f * PI);
+    *ny = 0.5f + ay * cosf(t * freq_y * 2.0f * PI);
 }
 
 void ai_update_pos(PetInst *pi)
@@ -126,54 +77,30 @@ void ai_update_pos(PetInst *pi)
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);
     int margin = 20;
-    float scale_x = (float)(sw - pi->w - 2 * margin);
-    float scale_y = (float)(sh - pi->h - 2 * margin);
 
-    float t = pi->ai_traj_t;
-    float nx, ny;
-    ai_trajectory_point(pi, t, &nx, &ny);
-
-    /* 计算轨迹切线方向 */
-    float dt = 0.0001f;
-    float nx2, ny2;
-    ai_trajectory_point(pi, t + dt, &nx2, &ny2);
-    float dir_x = (nx2 - nx) * scale_x;
-    float dir_y = (ny2 - ny) * scale_y;
-    float dir_len = sqrtf(dir_x * dir_x + dir_y * dir_y);
-    if (dir_len < 0.001f) dir_len = 0.001f;
-
-    /* 按弧长比例推进 t，使速度约为 1 像素/帧 */
-    pi->ai_traj_t += dt / dir_len;
+    /* 以固定速率推进 t */
+    pi->ai_traj_t += 0.003f;
     if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
 
-    /* 沿切线方向移动 1 像素，用子像素累加器保证平滑 */
-    pi->ai_subx += dir_x / dir_len;
-    pi->ai_suby += dir_y / dir_len;
+    float nx, ny;
+    ai_trajectory_point(pi, pi->ai_traj_t, &nx, &ny);
 
-    int ix = (int)pi->ai_subx;
-    int iy = (int)pi->ai_suby;
-    pi->ai_subx -= (float)ix;
-    pi->ai_suby -= (float)iy;
+    int target_x = margin + (int)(nx * (float)(sw - pi->w - 2 * margin));
+    int target_y = margin + (int)(ny * (float)(sh - pi->h - 2 * margin));
 
-    int old_x = pi->x;
-    int old_y = pi->y;
-    pi->x += ix;
-    pi->y += iy;
+    /* 逐步向目标位置移动，速度限制为 2 像素/帧 */
+    int dx = target_x - pi->x;
+    int dy = target_y - pi->y;
+    if (dx > 2) dx = 2; else if (dx < -2) dx = -2;
+    if (dy > 2) dy = 2; else if (dy < -2) dy = -2;
 
-    /* 边界限制 */
+    pi->x += dx;
+    pi->y += dy;
+
     if (pi->x < 0) pi->x = 0;
     if (pi->x > sw - pi->w) pi->x = sw - pi->w;
     if (pi->y < 0) pi->y = 0;
     if (pi->y > sh - pi->h) pi->y = sh - pi->h;
-
-    /* 完全被边界阻挡时快进 t，避免抖动 */
-    if (pi->x == old_x && pi->y == old_y && (ix != 0 || iy != 0)) {
-        pi->ai_subx = 0.0f;
-        pi->ai_suby = 0.0f;
-        pi->ai_traj_t += dt * 5.0f / dir_len;
-        if (pi->ai_traj_t > 1.0f) pi->ai_traj_t -= 1.0f;
-        return;
-    }
 
     SetWindowPos(pi->hwnd, NULL, pi->x, pi->y, 0, 0,
         SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -238,25 +165,16 @@ int ai_weighted_state(PetInst *pi)
 
 int ai_state_duration(int state, int activity)
 {
-    int base_min, base_max;
-    switch (state) {
-    case 0:  base_min = 3000; base_max = 7000; break; /* 闲置 */
-    case 1:
-    case 2:  base_min = 4000; base_max = 9000; break; /* 奔跑 */
-    case 3:  base_min = 2000; base_max = 4000; break; /* 挥手 */
-    case 4:  base_min = 1500; base_max = 3000; break; /* 跳跃 */
-    case 5:  base_min = 2000; base_max = 4000; break; /* 失败 */
-    case 6:  base_min = 2000; base_max = 5000; break; /* 等待 */
-    case 8:  base_min = 2000; base_max = 4000; break; /* 审查 */
-    default: base_min = 2000; base_max = 5000; break;
-    }
-    /* 活跃宠物动作更短，慵懒宠物停留更久 */
-    int adj = (activity - 1) * 800;
-    base_min -= adj;
-    base_max -= adj;
-    if (base_min < 800) base_min = 800;
-    if (base_max < base_min + 500) base_max = base_min + 500;
-    return base_min + rand() % (base_max - base_min);
+    static const struct { short mn, mx; } d[] = {
+        {3000,7000},{4000,9000},{4000,9000},{2000,4000},
+        {1500,3000},{2000,4000},{2000,5000},{2000,5000},{2000,4000}
+    };
+    int i = (unsigned)state > 8 ? 7 : state;
+    int mn = d[i].mn - (activity - 1) * 800;
+    int mx = d[i].mx - (activity - 1) * 800;
+    if (mn < 800) mn = 800;
+    if (mx < mn + 500) mx = mn + 500;
+    return mn + rand() % (mx - mn);
 }
 
 void ai_apply_state(PetInst *pi, int state, DWORD now)
@@ -288,13 +206,7 @@ void ai_pick_action(PetInst *pi, DWORD now)
     int next = ai_weighted_state(pi);
     int activity = pi->ai_p1 % 3;
 
-    /* 轨迹：80% 保持当前轨迹，20% 切换 */
-    if ((rand() % 100) < 20) {
-        pi->ai_traj_type = rand() % 10;
-        pi->ai_traj_t = (float)rand() / (float)RAND_MAX;
-    }
-
-    /* 从非奔跑切换到奔跑时，根据当前位置初始化 t 以减少跳跃 */
+    /* 从非奔跑切换到奔跑时，根据当前位置初始化 t */
     if ((pi->state != 1 && pi->state != 2) && (next == 1 || next == 2)) {
         int sw = GetSystemMetrics(SM_CXSCREEN);
         int margin = 20;

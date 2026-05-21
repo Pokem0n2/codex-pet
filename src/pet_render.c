@@ -39,7 +39,7 @@ void free_buffer(PetInst *pi)
     pi->dib_pixels = NULL;
 }
 
-void render_frame_to_buffer(Pet *pet, int fx, int fy, BYTE *dst)
+static void render_frame_to_buffer(Pet *pet, int fx, int fy, BYTE *dst)
 {
     if (!pet || !pet->pixels || !dst) return;
     int src_stride = pet->w * 4;
@@ -110,42 +110,17 @@ void render_preview_frame(Pet *pet, int fx, int fy)
 {
     if (!pet || !pet->pixels || !g_app.prev_pixels) return;
     int pw = g_app.prev_w, ph = g_app.prev_h;
-    int ox = (PREV_W - pw) / 2;
-    int oy = (PREV_H - ph) / 2;
+    int ox = (PREV_W - pw) >> 1;
+    int oy = (PREV_H - ph) >> 1;
     memset(g_app.prev_pixels, 0, PREV_W * PREV_H * 4);
     ensure_scale_buf();
     if (!g_scale_buf) return;
     render_frame_to_buffer(pet, fx, fy, g_scale_buf);
     for (int dy = 0; dy < ph; dy++) {
         int sy = (dy * CELL_H) / ph;
-        BYTE *row = g_app.prev_pixels + ((oy + dy) * PREV_W + ox) * 4;
-        for (int dx = 0; dx < pw; dx++) {
-            int sx = (dx * CELL_W) / pw;
-            *(DWORD *)&row[dx * 4] = *(DWORD *)&g_scale_buf[(sy * CELL_W + sx) * 4];
-        }
+        BYTE *d = g_app.prev_pixels + ((oy + dy) * PREV_W + ox) * 4;
+        const BYTE *s = g_scale_buf + sy * CELL_W * 4;
+        for (int dx = 0; dx < pw; dx++)
+            *(DWORD *)&d[dx * 4] = *(DWORD *)&s[((dx * CELL_W) / pw) * 4];
     }
-}
-
-void recreate_preview_buffer(void)
-{
-    HDC screen = GetDC(NULL);
-    if (g_app.prev_memdc) {
-        if (g_app.prev_oldbmp) SelectObject(g_app.prev_memdc, g_app.prev_oldbmp);
-        DeleteDC(g_app.prev_memdc);
-        g_app.prev_memdc = NULL;
-    }
-    if (g_app.prev_dib) { DeleteObject(g_app.prev_dib); g_app.prev_dib = NULL; }
-    g_app.prev_pixels = NULL;
-
-    BITMAPINFO bmi = {0};
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = g_app.prev_w;
-    bmi.bmiHeader.biHeight = -g_app.prev_h;
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-    g_app.prev_dib = CreateDIBSection(screen, &bmi, DIB_RGB_COLORS, (void **)&g_app.prev_pixels, NULL, 0);
-    g_app.prev_memdc = CreateCompatibleDC(screen);
-    g_app.prev_oldbmp = (HBITMAP)SelectObject(g_app.prev_memdc, g_app.prev_dib);
-    ReleaseDC(NULL, screen);
 }

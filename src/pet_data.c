@@ -1,8 +1,8 @@
 #include "pet_common.h"
 
-const int g_frame_counts[ROWS] = {6, 8, 8, 4, 5, 8, 6, 6, 6};
+const unsigned char g_frame_counts[ROWS] = {6, 8, 8, 4, 5, 8, 6, 6, 6};
 
-const int g_frame_durations[ROWS][8] = {
+const short g_frame_durations[ROWS][8] = {
     {280, 110, 110, 140, 140, 320,   0,   0},
     {120, 120, 120, 120, 120, 120, 120, 220},
     {120, 120, 120, 120, 120, 120, 120, 220},
